@@ -56,18 +56,23 @@ _STICKER_MAP = {
 # 触发概率
 _TRIGGER_RATE = 0.35
 
+# 模块加载时预计算：排序关键词 + 缓存有效文件路径
+_SORTED_KEYWORDS = sorted(_STICKER_MAP.keys(), key=len, reverse=True)
+_VALID_STICKERS = {}  # keyword → filepath（仅包含文件存在的）
+for _kw in _SORTED_KEYWORDS:
+    _fp = os.path.join(_STICKER_DIR, _STICKER_MAP[_kw])
+    if os.path.exists(_fp) and os.path.getsize(_fp) > 0:
+        _VALID_STICKERS[_kw] = _fp
+
 
 def get_sticker_message(text: str):
     """根据文本内容匹配关键词，返回表情包MessageSegment或None"""
-    # 按关键词长度降序匹配
-    for keyword in sorted(_STICKER_MAP.keys(), key=len, reverse=True):
+    for keyword in _SORTED_KEYWORDS:
         if keyword in text:
-            # 概率触发
             if random.random() > _TRIGGER_RATE:
                 return None
-            filename = _STICKER_MAP[keyword]
-            filepath = os.path.join(_STICKER_DIR, filename)
-            if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+            filepath = _VALID_STICKERS.get(keyword)
+            if filepath:
                 return MessageSegment.image(f"file://{filepath}")
     return None
 
@@ -80,7 +85,7 @@ def list_stickers():
         if filename in seen:
             continue
         seen.add(filename)
-        filepath = os.path.join(_STICKER_DIR, filename)
-        exists = os.path.exists(filepath) and os.path.getsize(filepath) > 0
+        filepath = _VALID_STICKERS.get(keyword)
+        exists = filepath is not None
         result.append(f"{'✓' if exists else '✗'} {filename} ← {keyword}")
     return result

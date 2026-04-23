@@ -9,11 +9,11 @@ logger = logging.getLogger("yuuki_chat.config")
 # 本地封面文件夹路径（存放 UI_Jacket_XXXXXX.png 格式的封面图片）
 # 留空则不使用本地封面
 LOCAL_COVER_DIR = ""
-_cfg = {}
+_driver_config = {}
 try:
     from nonebot import get_driver
-    _cfg = get_driver().config.dict()
-    LOCAL_COVER_DIR = _cfg.get("local_cover_dir", "") or ""
+    _driver_config = get_driver().config.dict()
+    LOCAL_COVER_DIR = _driver_config.get("local_cover_dir", "") or ""
 except Exception:
     pass
 logger.info(f"[启动] local_cover_dir={repr(LOCAL_COVER_DIR)}")
@@ -142,7 +142,7 @@ def save_persona(content):
 DEFAULT_GROUP = 1090761704
 ALLOWED_GROUPS = []
 try:
-    _raw = _cfg.get("allowed_groups", "") or ""
+    _raw = _driver_config.get("allowed_groups", "") or ""
     if _raw:
         ALLOWED_GROUPS = [int(g.strip()) for g in _raw.split(",") if g.strip()]
 except Exception:

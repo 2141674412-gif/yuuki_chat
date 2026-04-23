@@ -279,6 +279,7 @@ async def _cmd_update(event: MessageEvent):
         # 解压新文件（只覆盖 .py 文件，保留 assets 和 data）
         await _cmd_update_cmd.send("...正在更新文件...")
         extract_count = 0
+        plugin_dir_real = os.path.realpath(plugin_dir)
         try:
             with zipfile.ZipFile(update_zip, "r") as zf:
                 for name in zf.namelist():
@@ -289,6 +290,11 @@ async def _cmd_update(event: MessageEvent):
                     if name.endswith(".py") or name.startswith("assets/"):
                         # 安全路径拼接
                         target = os.path.join(plugin_dir, os.path.basename(name) if name.endswith(".py") else name)
+                        # 路径穿越检查
+                        target_real = os.path.realpath(target)
+                        if not target_real.startswith(plugin_dir_real + os.sep) and target_real != plugin_dir_real:
+                            logger.warning(f"[更新] 跳过非法路径: {name} -> {target_real}")
+                            continue
                         os.makedirs(os.path.dirname(target), exist_ok=True)
                         with zf.open(name) as src, open(target, "wb") as dst:
                             dst.write(src.read())

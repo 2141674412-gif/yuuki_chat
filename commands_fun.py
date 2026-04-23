@@ -561,7 +561,12 @@ draw_cmd = _register("抽签", _cmd_draw)
 # -- 运势 --
 
 async def _cmd_fortune(event: MessageEvent):
-    fortune_type = str(event.message).replace("运势", "").strip() or "综合"
+    content = str(event.message).strip()
+    for prefix in ["运势"]:
+        if content.startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+    fortune_type = content or "综合"
     items = {
         "综合": ["大吉", "吉", "中吉", "小吉", "凶"],
         "爱情": ["桃花运不错", "有点小暧昧", "平平淡淡", "主动一点", "...别急"],
@@ -579,7 +584,12 @@ fortune_cmd = _register("运势", _cmd_fortune)
 # -- 成语 --
 
 async def _cmd_idiom(event: MessageEvent):
-    last_idiom = str(event.message).replace("成语", "").strip()
+    content = str(event.message).strip()
+    for prefix in ["成语"]:
+        if content.startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+    last_idiom = content
     idioms = [
         "一心一意", "意气风发", "发愤图强", "强词夺理", "理直气壮",
         "壮志凌云", "云开雾散", "散兵游勇", "勇往直前", "前仆后继",

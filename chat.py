@@ -269,11 +269,12 @@ async def handle_chat(event: MessageEvent):
 
         # 流式请求（在线程中执行，避免阻塞事件循环）
         loop = asyncio.get_running_loop()
+        messages = list(chat_history[user_id])  # 复制到局部变量，避免线程竞态
 
         def _collect_stream():
             stream = client.chat.completions.create(
                 model=_cfg("model_name", "qwen2.5:7b-instruct"),
-                messages=chat_history[user_id],
+                messages=messages,
                 max_tokens=int(_cfg("max_tokens", "128")),
                 temperature=float(_cfg("temperature", "0.7")),
                 timeout=20.0,
@@ -286,6 +287,10 @@ async def handle_chat(event: MessageEvent):
             return ai_response
 
         ai_response = await loop.run_in_executor(None, _collect_stream)
+
+        # 检查history是否在等待期间被清理
+        if user_id not in chat_history:
+            return
 
         ai_response = ai_response.strip()
 
@@ -539,6 +544,8 @@ async def handle_qrcode(event: MessageEvent):
                         text = text.data
                     if isinstance(text, bytes):
                         text = text.decode("utf-8", errors="ignore")
+                else:
+                    text = ""
                 text = text.strip()
                 if text:
                     # 如果是SGWCMAID开头的二维码，回复识别结果
