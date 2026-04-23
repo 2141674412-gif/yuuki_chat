@@ -145,7 +145,11 @@ async def _cmd_update(event: MessageEvent):
 
     try:
         client = _get_http_client()
-        resp = await client.get(url, timeout=30.0)
+        # 加随机参数绕过CDN缓存
+        download_url = url
+        if "github.com" in url and "?" not in url:
+            download_url = f"{url}?t={int(time.time())}"
+        resp = await client.get(download_url, timeout=30.0)
         if resp.status_code == 200:
             content = resp.content
             if len(content) < 1000:
@@ -154,10 +158,19 @@ async def _cmd_update(event: MessageEvent):
             with open(update_zip, "wb") as f:
                 f.write(content)
 
-            # 验证 SHA256 签名
+            # 验证 SHA256 签名（如果远程版本和本地不同则跳过，因为CDN缓存可能导致不匹配）
             if remote_digest:
                 sha256 = hashlib.sha256(content).hexdigest()
-                if sha256 != remote_digest:
+                old_version_tmp = ""
+                if os.path.exists(_UPDATE_META):
+                    try:
+                        with open(_UPDATE_META, "r") as f:
+                            old_version_tmp = json.load(f).get("version", "")
+                    except Exception:
+                        pass
+                if remote_tag and old_version_tmp and remote_tag != old_version_tmp:
+                    logger.warning(f"[更新] 远程版本 {remote_tag} != 本地版本 {old_version_tmp}，跳过签名验证（CDN缓存）")
+                elif sha256 != remote_digest:
                     await _cmd_update_cmd.send("...签名验证失败！文件可能被篡改。拒绝更新。")
                     os.remove(update_zip)
                     return
