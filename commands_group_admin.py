@@ -279,6 +279,7 @@ async def _on_keyword_filter(bot: Bot, event: _GME):
 
 async def _cmd_set_welcome(event: MessageEvent):
     """设置欢迎语"""
+    global _welcome_enabled, _welcome_msg
     content = str(event.message).strip()
     for prefix in ["设置欢迎", "setwelcome"]:
         if content.lower().startswith(prefix.lower()):
@@ -295,7 +296,6 @@ async def _cmd_set_welcome(event: MessageEvent):
         return
 
     if content in ("开启", "on"):
-        global _welcome_enabled
         _welcome_enabled = True
         await _set_welcome_cmd.finish("...自动欢迎已开启。")
         return
@@ -304,7 +304,6 @@ async def _cmd_set_welcome(event: MessageEvent):
         await _set_welcome_cmd.finish("...自动欢迎已关闭。")
         return
 
-    global _welcome_msg
     _welcome_msg = content
     # 保存配置
     try:
@@ -379,6 +378,7 @@ async def _cmd_del_filter(event: MessageEvent):
 
 async def _cmd_filter_mode(event: MessageEvent):
     """设置过滤模式"""
+    global _filter_action
     content = str(event.message).strip()
     for prefix in ["过滤模式", "filtermode"]:
         if content.lower().startswith(prefix.lower()):
@@ -394,7 +394,6 @@ async def _cmd_filter_mode(event: MessageEvent):
         return
 
     if content in ("warn", "delete", "ban"):
-        global _filter_action
         _filter_action = content
         try:
             from .commands_base import _DATA_DIR
