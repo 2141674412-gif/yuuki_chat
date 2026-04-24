@@ -280,7 +280,7 @@ async def handle_chat(event: MessageEvent):
             stream = client.chat.completions.create(
                 model=_cfg("model_name", "qwen2.5:7b-instruct"),
                 messages=messages,
-                max_tokens=int(_cfg("max_tokens", "128")),
+                max_tokens=int(_cfg("max_tokens", "512")),
                 temperature=float(_cfg("temperature", "0.7")),
                 timeout=20.0,
                 stream=True,
@@ -303,9 +303,17 @@ async def handle_chat(event: MessageEvent):
 
         ai_response = ai_response.strip()
 
-        # 截断过长的回复
+        # 智能截断：在句子结束处断开，避免截断到一半
         if len(ai_response) > 500:
-            ai_response = ai_response[:500] + "..."
+            # 找最后一个句末标点
+            last_end = -1
+            for i, c in enumerate(ai_response[:500]):
+                if c in ('。', '！', '？', '…', '~', '～', '!', '?', '.', '」', '"', ')', '）'):
+                    last_end = i
+            if last_end > 200:  # 至少保留200字符
+                ai_response = ai_response[:last_end + 1]
+            else:
+                ai_response = ai_response[:500] + "..."
 
         if not ai_response:
             ai_response = "...嗯？"
@@ -333,16 +341,11 @@ async def handle_chat(event: MessageEvent):
         # API 超时，尝试重建客户端连接
         _reconnect_client()
         fallback = "嗯...正义的伙伴好像走神了，再说一次？"
-        if user_id in chat_history:
-            chat_history[user_id].append({"role": "assistant", "content": fallback})
-            _history_timestamps[user_id] = time.time()
+        # 错误不入历史，避免污染上下文
         await chat.finish(fallback)
     except APIError as e:
         # API 错误（如服务不可用、速率限制等）
         fallback = "唔...脑袋好像有点转不过来，等一下再来吧。"
-        if user_id in chat_history:
-            chat_history[user_id].append({"role": "assistant", "content": fallback})
-            _history_timestamps[user_id] = time.time()
         await chat.finish(fallback)
     except Exception as e:
         # 其他未预期的错误
@@ -356,9 +359,7 @@ async def handle_chat(event: MessageEvent):
         ]
 
         ai_response = random.choice(fallback)
-        if user_id in chat_history:
-            chat_history[user_id].append({"role": "assistant", "content": ai_response})
-            _history_timestamps[user_id] = time.time()
+        # 错误不入历史
         await chat.finish(ai_response)
 
 
