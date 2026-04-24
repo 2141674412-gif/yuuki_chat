@@ -65,17 +65,29 @@ def _get_plugin_dir() -> str:
 
 
 def _get_current_version() -> str:
-    """获取当前版本（从 git hash 或文件时间戳）"""
+    """获取当前版本（从 .version 文件 → update.json → 时间戳）"""
     plugin_dir = _get_plugin_dir()
-    # 优先从 .version 文件读取
+    # 1. 优先从 .version 文件读取
     version_file = os.path.join(plugin_dir, ".version")
     if os.path.exists(version_file):
         try:
             with open(version_file, "r") as f:
-                return f.read().strip()
+                v = f.read().strip()
+                if v:
+                    return v
         except Exception:
             pass
-    # 兜底：用文件修改时间
+    # 2. 兜底从 update.json 读取
+    if os.path.exists(_UPDATE_META):
+        try:
+            with open(_UPDATE_META, "r") as f:
+                meta = json.load(f)
+                v = meta.get("version", "")
+                if v:
+                    return v
+        except Exception:
+            pass
+    # 3. 最后兜底：用文件修改时间
     return datetime.now().strftime("%Y%m%d%H%M%S")
 
 
@@ -327,6 +339,10 @@ async def _cmd_update(event: MessageEvent):
                     "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "files": extract_count,
                 }, f, ensure_ascii=False, indent=2)
+            # 同时写入 .version 文件，让 _get_current_version() 能读到正确版本
+            version_file = os.path.join(_get_plugin_dir(), ".version")
+            with open(version_file, "w") as f:
+                f.write(version)
         except Exception:
             pass
 
