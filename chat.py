@@ -614,7 +614,7 @@ def _compress_image(img_data: bytes, max_size: int = _MAX_IMAGE_SIZE, max_bytes:
 
         if scale < 1.0:
             new_size = (int(img.width * scale), int(img.height * scale))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
+            img = img.resize(new_size, Image.LANCZOS)
 
         output = BytesIO()
         img.save(output, format='JPEG', quality=85)
