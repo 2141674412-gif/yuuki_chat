@@ -1,3 +1,4 @@
+import json
 import os
 import logging
 import tempfile
@@ -147,7 +148,16 @@ try:
         ALLOWED_GROUPS = [int(g.strip()) for g in _raw.split(",") if g.strip()]
 except Exception:
     pass
-# 如果环境变量没配置，使用默认群
+# 如果环境变量没配置，尝试从 allowed_groups.json 读取（/加群 命令保存的）
+if not ALLOWED_GROUPS:
+    _groups_json = os.path.join(os.path.normpath(os.path.join(_PLUGIN_DIR, '..', '..')), 'allowed_groups.json')
+    if os.path.exists(_groups_json):
+        try:
+            with open(_groups_json, 'r', encoding='utf-8') as _f:
+                ALLOWED_GROUPS = json.load(_f)
+        except Exception:
+            pass
+# 如果都没有，使用默认群
 if not ALLOWED_GROUPS:
     ALLOWED_GROUPS = [DEFAULT_GROUP]
 logger.info(f"[启动] allowed_groups={ALLOWED_GROUPS}")

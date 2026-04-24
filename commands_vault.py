@@ -198,7 +198,7 @@ async def _cmd_vault_setkey(event: MessageEvent):
     existing_key = _get_user_custom_key(user_id)
     if existing_key is not None:
         # 已有自定义密钥，需要验证旧密钥
-        await vault_setkey_cmd.finish("你已经设置过密钥了。如需修改请先 /修改密钥")
+        await vault_setkey_cmd.finish("你已经设置过密钥了。如需更换，请先 /删除密钥 后重新设置。")
         return
     # 第一次设置，需要验证默认密码
     if _get_user_password(user_id) is None:
@@ -230,6 +230,10 @@ async def _cmd_vault_changepw(event: MessageEvent):
         await vault_changepw_cmd.finish("...新密码太短了，至少4位。")
         return
     user_id = str(event.user_id)
+    # 如果设置了自定义密钥，不允许直接修改密码（会导致数据锁死）
+    if _get_user_custom_key(user_id) is not None:
+        await vault_changepw_cmd.finish("...你设置了自定义密钥，无法直接修改密码。\n请先删除密钥：/设置密钥（不推荐），或联系管理员。")
+        return
     ok, err = _require_password(user_id, old_pw)
     if not ok:
         await vault_changepw_cmd.finish(err)

@@ -318,14 +318,16 @@ async def handle_chat(event: MessageEvent):
         # API 超时，尝试重建客户端连接
         _reconnect_client()
         fallback = "嗯...正义的伙伴好像走神了，再说一次？"
-        chat_history[user_id].append({"role": "assistant", "content": fallback})
-        _history_timestamps[user_id] = time.time()
+        if user_id in chat_history:
+            chat_history[user_id].append({"role": "assistant", "content": fallback})
+            _history_timestamps[user_id] = time.time()
         await chat.finish(fallback)
     except APIError as e:
         # API 错误（如服务不可用、速率限制等）
         fallback = "唔...脑袋好像有点转不过来，等一下再来吧。"
-        chat_history[user_id].append({"role": "assistant", "content": fallback})
-        _history_timestamps[user_id] = time.time()
+        if user_id in chat_history:
+            chat_history[user_id].append({"role": "assistant", "content": fallback})
+            _history_timestamps[user_id] = time.time()
         await chat.finish(fallback)
     except Exception as e:
         # 其他未预期的错误
@@ -339,8 +341,9 @@ async def handle_chat(event: MessageEvent):
         ]
 
         ai_response = random.choice(fallback)
-        chat_history[user_id].append({"role": "assistant", "content": ai_response})
-        _history_timestamps[user_id] = time.time()
+        if user_id in chat_history:
+            chat_history[user_id].append({"role": "assistant", "content": ai_response})
+            _history_timestamps[user_id] = time.time()
         await chat.finish(ai_response)
 
 

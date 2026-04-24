@@ -30,7 +30,7 @@ async def _cmd_remind(event: MessageEvent):
         if user_id not in reminders:
             reminders[user_id] = []
 
-        reminder_id = len(reminders[user_id]) + 1
+        reminder_id = max((r["id"] for r in reminders[user_id]), default=0) + 1
         reminders[user_id].append({
             "id": reminder_id, "content": remind_content,
             "time": remind_time, "created": now
