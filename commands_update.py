@@ -12,8 +12,8 @@ import zipfile
 from datetime import datetime
 
 # 第三方库
-from nonebot import logger
-from nonebot.adapters.onebot.v11 import MessageEvent
+from nonebot import logger, get_bot
+from nonebot.adapters.onebot.v11 import Bot, MessageEvent, Message
 from nonebot.exception import FinishedException
 
 # 从子模块导入
@@ -285,6 +285,22 @@ async def _cmd_update(event: MessageEvent):
     user_id = str(event.user_id)
     logger.info(f"[更新] 收到更新请求 from {user_id}")
 
+    try:
+        bot: Bot = get_bot()
+    except Exception:
+        logger.error("[更新] 无法获取bot实例")
+        return
+
+    async def _send(msg):
+        """发送消息到当前会话"""
+        try:
+            if hasattr(event, 'group_id') and event.group_id:
+                await bot.send_group_msg(group_id=event.group_id, message=Message(msg))
+            else:
+                await bot.send_private_msg(user_id=int(user_id), message=Message(msg))
+        except Exception as e:
+            logger.error(f"[更新] 发送消息失败: {e}")
+
     # 检查锁
     if os.path.exists(_UPDATE_LOCK):
         try:
@@ -292,34 +308,34 @@ async def _cmd_update(event: MessageEvent):
             if lock_age > 300:
                 os.remove(_UPDATE_LOCK)
             else:
-                await _cmd_update_cmd.finish("...正在更新中，请稍等。")
+                await _send("...正在更新中，请稍等。")
                 return
         except Exception:
-            await _cmd_update_cmd.finish("...正在更新中，请稍等。")
+            await _send("...正在更新中，请稍等。")
             return
 
     # 1. 获取远程版本
-    await _cmd_update_cmd.send("...正在检查更新...")
+    await _send("...正在检查更新...")
     client = _get_http_client()
     remote_tag, remote_digest = await _fetch_remote_info(client)
 
     if not remote_tag:
-        await _cmd_update_cmd.finish("...无法获取远程版本信息，请稍后再试。")
+        await _send("...无法获取远程版本信息，请稍后再试。")
         return
 
     # 2. 版本比较（核心逻辑：tag不同就更新）
     current_version = _get_current_version()
     if remote_tag == current_version:
-        await _cmd_update_cmd.finish("...已经是最新版本了。")
+        await _send("...已经是最新版本了。")
         return
 
     # 3. 下载
-    await _cmd_update_cmd.send(f"...发现新版本 {remote_tag}，正在下载...")
+    await _send(f"...发现新版本 {remote_tag}，正在下载...")
     url = _get_update_url()
     ok, result = await _download_update(client, url)
 
     if not ok:
-        await _cmd_update_cmd.finish(f"...下载失败：{result}")
+        await _send(f"...下载失败：{result}")
         return
 
     update_zip = result
@@ -329,19 +345,19 @@ async def _cmd_update(event: MessageEvent):
     if remote_digest:
         sha256 = hashlib.sha256(open(update_zip, "rb").read()).hexdigest()
         if sha256 != remote_digest:
-            await _cmd_update_cmd.send("...签名验证失败！文件可能被篡改。")
+            await _send("...签名验证失败！文件可能被篡改。")
             try:
                 os.remove(update_zip)
             except Exception:
                 pass
             return
 
-    await _cmd_update_cmd.send(f"...下载完成（{size_kb:.1f}KB），正在验证...")
+    await _send(f"...下载完成（{size_kb:.1f}KB），正在验证...")
 
     # 5. 验证zip
     ok, err = _verify_zip(update_zip)
     if not ok:
-        await _cmd_update_cmd.finish(f"...更新文件无效：{err}")
+        await _send(f"...更新文件无效：{err}")
         return
 
     # 6. 创建锁
@@ -353,11 +369,11 @@ async def _cmd_update(event: MessageEvent):
 
     try:
         # 7. 备份
-        await _cmd_update_cmd.send("...正在备份...")
+        await _send("...正在备份...")
         _backup_current()
 
         # 8. 解压
-        await _cmd_update_cmd.send("...正在更新文件...")
+        await _send("...正在更新文件...")
         extract_count = _extract_update(update_zip)
 
         # 9. 保存版本
@@ -373,15 +389,13 @@ async def _cmd_update(event: MessageEvent):
         # 11. 记录日志
         _append_changelog(remote_tag, f"自动更新，{extract_count} 个文件", user_id)
 
-        await _cmd_update_cmd.send(f"...更新完成！{remote_tag}，{extract_count} 个文件。正在重启...")
+        await _send(f"...更新完成！{remote_tag}，{extract_count} 个文件。正在重启...")
 
         # 12. 重启
         err = _do_restart(user_id, event)
         if err:
-            await _cmd_update_cmd.finish(f"...更新成功但重启失败：{err}，请手动重启。")
+            await _send(f"...更新成功但重启失败：{err}，请手动重启。")
 
-    except FinishedException:
-        raise
     except Exception as e:
         # 恢复备份
         _restore_backup()
@@ -389,7 +403,7 @@ async def _cmd_update(event: MessageEvent):
             os.remove(_UPDATE_LOCK)
         except Exception:
             pass
-        await _cmd_update_cmd.finish(f"...更新失败，已恢复旧版本：{type(e).__name__}")
+        await _send(f"...更新失败，已恢复旧版本：{type(e).__name__}")
 
 
 async def _cmd_update_status(event: MessageEvent):
