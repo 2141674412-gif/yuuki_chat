@@ -63,11 +63,25 @@ def _get_client() -> OpenAI:
     if _client is None:
         with _client_lock:
             if _client is None:
-                _client = OpenAI(
-                    api_key=_cfg("api_key", "ollama"),
-                    base_url=_cfg("api_base", "http://127.0.0.1:11434/v1")
-                )
+                _client = _create_client()
     return _client
+
+
+def _create_client() -> OpenAI:
+    """创建 OpenAI 客户端（带连接超时和自动重试）"""
+    import httpx
+    # 自定义httpx客户端：连接超时5秒，读取超时60秒，自动重连
+    http_client = httpx.Client(
+        timeout=httpx.Timeout(5.0, connect=10.0, read=60.0, write=10.0, pool=5.0),
+        limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        transport=httpx.HTTPTransport(retries=2),
+    )
+    return OpenAI(
+        api_key=_cfg("api_key", "ollama"),
+        base_url=_cfg("api_base", "http://127.0.0.1:11434/v1"),
+        http_client=http_client,
+        max_retries=2,  # SDK级别重试
+    )
 
 
 def _reconnect_client():
@@ -79,10 +93,7 @@ def _reconnect_client():
                 _client.close()
             except Exception:
                 pass
-        _client = OpenAI(
-            api_key=_cfg("api_key", "ollama"),
-            base_url=_cfg("api_base", "http://127.0.0.1:11434/v1")
-        )
+        _client = _create_client()
 
 
 # 对话历史存储
@@ -280,7 +291,11 @@ async def handle_chat(event: MessageEvent):
                     ai_response += chunk.choices[0].delta.content
             return ai_response
 
-        ai_response = await loop.run_in_executor(None, _collect_stream)
+        # 流式请求总超时保护（防止服务端断开后无限等待）
+        ai_response = await asyncio.wait_for(
+            loop.run_in_executor(None, _collect_stream),
+            timeout=90.0
+        )
 
         # 检查history是否在等待期间被清理
         if user_id not in chat_history:
