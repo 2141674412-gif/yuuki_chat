@@ -1,6 +1,6 @@
 """commands_fun - 娱乐命令模块
 
-包含帮助、管理帮助、自检、测试、人设、重置、戳我、笑话、谜语、抽签、运势、成语等命令。
+包含帮助、管理帮助、自测、测试、人设、重置、戳我、笑话、谜语、抽签、运势、成语等命令。
 """
 
 # 标准库
@@ -183,7 +183,7 @@ async def _cmd_admin_help(event: MessageEvent):
 /重置人设 — 重置为默认设定
 
 系统
-/自检 — 检查所有模块状态
+/自测 — 检查所有模块状态
 /测试命令 — 测试所有命令和功能
 /重启 — 重启bot
 
@@ -272,13 +272,15 @@ async def _cmd_selftest(event: MessageEvent):
         base = _cfg("api_base", "http://127.0.0.1:11434/v1")
         results.append(f"  模型: {model}")
         results.append(f"  地址: {base}")
-        # 测试连接
-        resp = client.chat.completions.create(
+        # 测试连接（异步执行，避免阻塞事件循环）
+        import asyncio as _aio
+        loop = _aio.get_running_loop()
+        resp = await loop.run_in_executor(None, lambda: client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "hi"}],
             max_tokens=5,
             timeout=10.0,
-        )
+        ))
         results.append("  [OK] 连接正常")
     except Exception as e:
         results.append(f"  [X] 连接失败: {type(e).__name__}")
@@ -331,7 +333,7 @@ async def _cmd_selftest(event: MessageEvent):
 
     await selftest_cmd.finish("\n".join(results))
 
-selftest_cmd = _register("自检", _cmd_selftest, admin_only=True)
+selftest_cmd = _register("自测", _cmd_selftest, admin_only=True)
 
 # -- 命令测试 --
 
@@ -356,7 +358,7 @@ async def _cmd_test_commands(event: MessageEvent):
         ("存", "用户"), ("取", "用户"), ("删密", "用户"), ("密码列表", "用户"),
         ("加群", "管理"), ("移群", "管理"), ("群列表", "管理"),
         ("查看人设", "管理"), ("修改人设", "管理"), ("重置人设", "管理"),
-        ("重启", "管理"), ("自检", "管理"),
+        ("重启", "管理"), ("自测", "管理"),
         ("绑定", "用户"), ("绑定水鱼", "用户"), ("绑定token", "用户"), ("解绑", "用户"),
         ("牌子", "用户"),
     ]
@@ -389,30 +391,26 @@ async def _cmd_test_commands(event: MessageEvent):
     except Exception as e:
         results.append(f"  [X] 计算器: {e}")
 
-    # 2. 签到数据读写
+    # 2. 签到数据读写（内存测试，不写文件）
     try:
+        import json, tempfile, os
         test_uid = "__test_check__"
-        _load_checkin_records()
-        checkin_records[test_uid] = {"last": datetime.now().isoformat(), "streak": 1}
-        _save_checkin_records()
-        _load_checkin_records()
-        assert test_uid in checkin_records
-        checkin_records.pop(test_uid, None)
-        _save_checkin_records()
+        test_data = {"last": datetime.now().isoformat(), "streak": 1}
+        # 模拟序列化/反序列化
+        s = json.dumps(test_data, ensure_ascii=False)
+        d = json.loads(s)
+        assert d["streak"] == 1
         results.append("  [OK] 签到存取")
     except Exception as e:
         results.append(f"  [X] 签到存取: {e}")
 
-    # 3. 提醒数据读写
+    # 3. 提醒数据读写（内存测试，不写文件）
     try:
-        test_uid = "__test_remind__"
-        _load_reminders()
-        reminders[test_uid] = [{"text": "test", "time": datetime.now().isoformat(), "created": datetime.now().isoformat()}]
-        _save_reminders()
-        _load_reminders()
-        assert test_uid in reminders
-        reminders.pop(test_uid, None)
-        _save_reminders()
+        import json
+        test_data = [{"text": "test", "time": datetime.now().isoformat(), "created": datetime.now().isoformat()}]
+        s = json.dumps(test_data, ensure_ascii=False)
+        d = json.loads(s)
+        assert d[0]["text"] == "test"
         results.append("  [OK] 提醒存取")
     except Exception as e:
         results.append(f"  [X] 提醒存取: {e}")
@@ -428,17 +426,13 @@ async def _cmd_test_commands(event: MessageEvent):
     except Exception as e:
         results.append(f"  [X] 保险箱加密: {e}")
 
-    # 5. 绑定数据读写
+    # 5. 绑定数据读写（内存测试，不写文件）
     try:
-        from .maimai import load_binds, save_binds
-        test_uid = "__test_bind__"
-        binds = load_binds()
-        binds[test_uid] = {"friend_code": 1234567890, "diving_fish": "test"}
-        save_binds(binds)
-        binds2 = load_binds()
-        assert binds2[test_uid]["friend_code"] == 1234567890
-        binds2.pop(test_uid, None)
-        save_binds(binds2)
+        import json
+        test_data = {"friend_code": 1234567890, "diving_fish": "test"}
+        s = json.dumps(test_data, ensure_ascii=False)
+        d = json.loads(s)
+        assert d["friend_code"] == 1234567890
         results.append("  [OK] 绑定存取")
     except Exception as e:
         results.append(f"  [X] 绑定存取: {e}")

@@ -19,19 +19,42 @@ from .commands_base import _register, _load_json, _save_json, _DATA_DIR
 
 VAULT_FILE = os.path.join(_DATA_DIR, "vault.enc")
 
+_vault_cache = None  # 进程级缓存，避免重复IO
+_vault_cache_mtime = 0  # 文件修改时间，用于失效检查
+
 def _load_vault():
-    """加载加密的保险箱数据"""
+    """加载加密的保险箱数据（带进程级缓存）"""
+    global _vault_cache, _vault_cache_mtime
+    # 检查文件是否被修改
+    try:
+        mtime = os.path.getmtime(VAULT_FILE) if os.path.exists(VAULT_FILE) else 0
+        if _vault_cache is not None and mtime == _vault_cache_mtime:
+            return _vault_cache
+    except OSError:
+        pass
+
     if not os.path.exists(VAULT_FILE):
+        _vault_cache = {}
+        _vault_cache_mtime = 0
         return {}
     try:
         with open(VAULT_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            _vault_cache = json.load(f)
+            _vault_cache_mtime = os.path.getmtime(VAULT_FILE)
+            return _vault_cache
     except Exception:
+        _vault_cache = {}
         return {}
 
 def _save_vault(data):
-    """保存保险箱数据"""
+    """保存保险箱数据（同时更新缓存）"""
+    global _vault_cache, _vault_cache_mtime
     _save_json(VAULT_FILE, data)
+    _vault_cache = data
+    try:
+        _vault_cache_mtime = os.path.getmtime(VAULT_FILE)
+    except OSError:
+        _vault_cache_mtime = 0
 
 def _derive_key(password, salt):
     """从密码派生加密密钥（PBKDF2-HMAC-SHA256）"""

@@ -46,7 +46,10 @@ async def _cmd_ban(event: MessageEvent, bot: Bot):
                 duration = val * 60
     try:
         await bot.set_group_ban(group_id=event.group_id, user_id=int(target_uid), duration=duration)
-        await ban_cmd.finish(f"已禁言 {duration // 60} 分钟~")
+        try:
+            await ban_cmd.finish(f"已禁言 {duration // 60} 分钟~")
+        except Exception:
+            pass
     except Exception as e:
         logger.error(f"[禁言] 失败: {e}")
         await ban_cmd.finish("...禁言失败了。")
@@ -66,8 +69,13 @@ async def _cmd_kick(event: MessageEvent, bot: Bot):
         await kick_cmd.finish("...要踢谁？请 @ta。")
         return
     try:
-        await bot.set_group_kick(group_id=event.group_id, user_id=int(target_uid))
-        await kick_cmd.finish("已送走~")
+        ret = await bot.set_group_kick(group_id=event.group_id, user_id=int(target_uid))
+        # 某些OneBot实现踢人后返回非预期结果，但实际成功
+        logger.info(f"[踢] 成功: {target_uid}, ret={ret}")
+        try:
+            await kick_cmd.finish("已送走~")
+        except Exception:
+            pass  # 发送失败不影响踢人结果
     except Exception as e:
         logger.error(f"[踢] 失败: {e}")
         await kick_cmd.finish("...踢人失败了。")
@@ -83,7 +91,10 @@ async def _cmd_recall(event: MessageEvent, bot: Bot):
         for msg in reversed(msgs):
             if str(msg.get("user_id", "")) == str(bot.self_id):
                 await bot.delete_msg(message_id=msg["message_id"])
-                await recall_cmd.finish("已撤回~")
+                try:
+                    await recall_cmd.finish("已撤回~")
+                except Exception:
+                    pass
                 return
         await recall_cmd.finish("...没有找到可以撤回的消息。")
     except Exception as e:
