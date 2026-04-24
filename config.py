@@ -7,6 +7,8 @@ logger = logging.getLogger("yuuki_chat.config")
 
 # ========== 路径配置 ==========
 
+_PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # 本地封面文件夹路径（存放 UI_Jacket_XXXXXX.png 格式的封面图片）
 # 留空则不使用本地封面
 LOCAL_COVER_DIR = ""
@@ -182,7 +184,6 @@ MAIMAI_VERSIONS = [
 ]
 
 # 数据目录（放在bot根目录下的 yuuki_data，解压插件不会影响）
-_PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 _DATA_DIR = os.path.join(os.getcwd(), "yuuki_data")
 os.makedirs(_DATA_DIR, exist_ok=True)
 DATA_DIR = _DATA_DIR
