@@ -49,7 +49,7 @@ async def _cmd_ban(event: MessageEvent, bot: Bot):
         await ban_cmd.finish(f"已禁言 {duration // 60} 分钟~")
     except Exception as e:
         logger.error(f"[禁言] 失败: {e}")
-        await ban_cmd.finish(f"...禁言失败了：{e}")
+        await ban_cmd.finish("...禁言失败了。")
 
 async def _cmd_kick(event: MessageEvent, bot: Bot):
     """踢人：/踢 @某人"""
@@ -70,7 +70,7 @@ async def _cmd_kick(event: MessageEvent, bot: Bot):
         await kick_cmd.finish("已送走~")
     except Exception as e:
         logger.error(f"[踢] 失败: {e}")
-        await kick_cmd.finish(f"...踢人失败了：{e}")
+        await kick_cmd.finish("...踢人失败了。")
 
 async def _cmd_recall(event: MessageEvent, bot: Bot):
     """撤回 bot 发送的最后一条消息"""
@@ -88,7 +88,7 @@ async def _cmd_recall(event: MessageEvent, bot: Bot):
         await recall_cmd.finish("...没有找到可以撤回的消息。")
     except Exception as e:
         logger.error(f"[撤回] 失败: {e}")
-        await recall_cmd.finish(f"...撤回失败了：{e}")
+        await recall_cmd.finish("...撤回失败了。")
 
 # 群管命令需要 Bot 参数，手动注册
 _ban_cmd = on_command("禁言", priority=1)

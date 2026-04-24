@@ -149,6 +149,17 @@ from .utils import get_shared_http_client as get_http_client
 
 # ---- 用户成绩缓存（5分钟TTL） ----
 _user_records_cache: dict = {}  # {username: {"data": ..., "time": float}}
+_MAX_CACHE_SIZE = 200  # 最大缓存条目数
+
+def _cache_set(key: str, data):
+    """写入缓存，超过上限时清理最旧的"""
+    global _user_records_cache
+    if len(_user_records_cache) >= _MAX_CACHE_SIZE:
+        # 删除最旧的20%
+        sorted_keys = sorted(_user_records_cache, key=lambda k: _user_records_cache[k].get("time", 0))
+        for k in sorted_keys[:_MAX_CACHE_SIZE // 5]:
+            del _user_records_cache[k]
+    _user_records_cache[key] = {"data": data, "time": time.time()}
 _USER_RECORDS_TTL = 300  # 5分钟缓存
 
 # ---- 绑定数据读写 ----
@@ -1074,7 +1085,7 @@ async def handle_mai(event: MessageEvent):
 
             # 更新缓存
             if _cache_key and "error" not in data:
-                _user_records_cache[_cache_key] = {"data": data, "time": time.time()}
+                _cache_set(_cache_key, data)
                 logger.info(f"[mai] 用户成绩已缓存: {_cache_key}")
 
         # 调试日志：打印返回数据的结构
@@ -1342,7 +1353,7 @@ async def handle_mai_plate(event: MessageEvent):
             _convert_records_to_charts(player_data)
 
             # 更新缓存
-            _user_records_cache[_plate_cache_key] = {"data": player_data, "time": time.time()}
+            _cache_set(_plate_cache_key, player_data)
             logger.info(f"[牌子] 用户成绩已缓存: {_plate_cache_key}")
         else:
             await mai_plate_cmd.send("正在获取成绩数据...（数据可能有5分钟延迟）")

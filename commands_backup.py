@@ -176,7 +176,7 @@ async def _cmd_import(event: MessageEvent):
             with zipfile.ZipFile(zip_path, "r") as zf:
                 # Zip Slip 防护：检查所有文件名
                 for name in zf.namelist():
-                    if name.startswith("/") or ".." in name.split("/"):
+                    if name.startswith("/") or ".." in name.split("/") or ".." in name.split("\\"):
                         await import_cmd.finish("...zip 文件包含非法路径，拒绝导入。")
                         return
                 zf.extractall(tmpdir)

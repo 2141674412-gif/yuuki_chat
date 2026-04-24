@@ -131,11 +131,23 @@ def _load_json(filepath: str) -> dict:
 
 
 def _save_json(filepath: str, data: dict) -> None:
-    """将数据保存到 JSON 文件。"""
+    """将数据保存到 JSON 文件（原子写入，防止崩溃损坏）。"""
     try:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        # 先写临时文件，再替换，保证原子性
+        import tempfile as _tf
+        fd, tmp = _tf.mkstemp(dir=os.path.dirname(filepath), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, filepath)
+        except Exception:
+            # 清理临时文件
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
     except OSError as e:
         logger.error(f"[commands] 保存文件失败 {filepath}: {e}")
 

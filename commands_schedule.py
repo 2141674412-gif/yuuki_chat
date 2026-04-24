@@ -1,6 +1,7 @@
 # ========== 定时任务 ==========
 
 # 标准库
+import asyncio
 import json
 import os
 import re
@@ -338,13 +339,17 @@ _load_alert_config()
 
 HEARTBEAT_FILE = os.path.join(_DATA_DIR, "heartbeat.txt")
 
-def _write_heartbeat():
-    """写入心跳文件"""
+async def _write_heartbeat():
+    """写入心跳文件（异步，避免阻塞事件循环）"""
     try:
-        with open(HEARTBEAT_FILE, "w") as f:
-            f.write(str(time.time()))
+        await asyncio.to_thread(_sync_write_heartbeat)
     except Exception as e:
         logger.error(f"[告警] 心跳写入失败: {e}")
+
+def _sync_write_heartbeat():
+    """同步写入心跳文件"""
+    with open(HEARTBEAT_FILE, "w") as f:
+        f.write(str(time.time()))
 
 async def _cmd_set_alert(event: MessageEvent):
     """设置告警：/设置告警 开/关"""

@@ -17,6 +17,26 @@ except ImportError:
 _PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 _COVER_CACHE_DIR = os.path.join(_PLUGIN_DIR, "cover_cache")
 os.makedirs(_COVER_CACHE_DIR, exist_ok=True)
+_MAX_COVER_CACHE = 500  # 最大缓存文件数
+
+def _cleanup_cover_cache():
+    """清理封面缓存，保留最新的 _MAX_COVER_CACHE 个文件"""
+    try:
+        files = []
+        for f in os.listdir(_COVER_CACHE_DIR):
+            if f.endswith(".png"):
+                files.append((os.path.join(_COVER_CACHE_DIR, f),
+                              os.path.getmtime(os.path.join(_COVER_CACHE_DIR, f))))
+        if len(files) > _MAX_COVER_CACHE:
+            # 按修改时间排序，删除最旧的
+            files.sort(key=lambda x: x[1])
+            for path, _ in files[:len(files) - _MAX_COVER_CACHE]:
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+    except Exception:
+        pass
 
 _font_cache = {}                                  # 字体缓存 (size, bold) -> Font
 _sorted_achiev_labels = sorted(                   # 预排序成就标签（降序）
@@ -225,6 +245,7 @@ async def download_cover(http_client, song_id, size=(100, 100)):
                     # 保存到磁盘缓存
                     try:
                         cover_img.save(cache_path, "PNG")
+                        _cleanup_cover_cache()
                     except Exception as e:
                         logger.debug(f"[封面缓存] 保存失败 song_id={song_id}, error={e}")
                     return resized

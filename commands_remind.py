@@ -27,6 +27,9 @@ async def _cmd_remind(event: MessageEvent):
         remind_time = now + delta[unit]
         remind_content = content.replace(time_match.group(0), "").strip()
 
+        if remind_time <= now:
+            await remind_cmd.finish("时间已过，请设置未来的时间。")
+
         if user_id not in reminders:
             reminders[user_id] = []
 

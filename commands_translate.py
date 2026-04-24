@@ -102,8 +102,8 @@ async def _cmd_translate(event: MessageEvent):
                 result = t.result()
                 if result:
                     await translate_cmd.finish(f"{text_to_translate}\n→ {result}")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[翻译] {e}")
 
     if _timeout_hit:
         await translate_cmd.finish("...翻译超时了，稍后再试。")

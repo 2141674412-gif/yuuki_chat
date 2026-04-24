@@ -362,7 +362,7 @@ async def _cmd_update(event: MessageEvent):
             subprocess.Popen([sys.executable, bot_path], cwd=project_dir)
             sys.stdout.flush()
             sys.stderr.flush()
-            os._exit(0)
+            sys.exit(0)
         except Exception as e:
             await _cmd_update_cmd.finish(f"...更新成功但重启失败：{e}，请手动重启。")
 

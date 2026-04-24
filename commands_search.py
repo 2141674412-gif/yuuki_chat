@@ -156,8 +156,8 @@ async def _cmd_search(event: MessageEvent):
                 results = t.result()
                 if results:
                     await search_cmd.finish("\n".join(results[:6]))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[搜索] {e}")
 
     await search_cmd.finish(f"...没搜到「{content}」的相关结果。换个关键词试试？")
 

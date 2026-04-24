@@ -1,10 +1,12 @@
 # ========== 远程执行（仅管理员） ==========
 
 import os
+import sys
 import subprocess
 import tempfile
 import asyncio
 import re
+import shutil
 
 from nonebot import logger
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
@@ -57,12 +59,29 @@ async def _cmd_run(event: MessageEvent):
     await run_cmd.send(f"...执行中：`{content}`")
 
     try:
-        proc = await asyncio.create_subprocess_shell(
-            content,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=os.getcwd()
-        )
+        # 使用shell=False防止shell注入，但需要手动解析命令
+        # 对于简单命令直接用exec，管道等复杂命令仍用shell（管理员信任）
+        if any(c in content for c in ('|', '&&', '||', '>', '<', '$(', '`')):
+            # 包含shell特性的命令，使用shell（管理员已验证）
+            proc = await asyncio.create_subprocess_shell(
+                content,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=os.getcwd()
+            )
+        else:
+            # 简单命令，用exec防止注入
+            import shlex
+            try:
+                args = shlex.split(content, posix=(sys.platform != "win32"))
+            except ValueError:
+                args = content.split()
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=os.getcwd()
+            )
 
         try:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=_CMD_TIMEOUT)
@@ -150,7 +169,12 @@ async def _cmd_exec(event: MessageEvent):
 
     # 保存到临时文件
     tmp_dir = tempfile.mkdtemp(prefix="yuuki_exec_")
-    tmp_file = os.path.join(tmp_dir, file_name)
+    # 安全化文件名（防止路径穿越和shell元字符）
+    safe_name = os.path.basename(file_name)
+    safe_name = re.sub(r'[^\w\.\-]', '_', safe_name)
+    if not safe_name or safe_name.startswith('.'):
+        safe_name = "script" + ext
+    tmp_file = os.path.join(tmp_dir, safe_name)
 
     try:
         with open(tmp_file, "wb") as f:
@@ -213,11 +237,9 @@ async def _cmd_exec(event: MessageEvent):
     except Exception as e:
         await exec_cmd.finish(f"...执行出错：{type(e).__name__}: {e}")
     finally:
-        # 清理临时文件
+        # 递归清理临时目录
         try:
-            for f in os.listdir(tmp_dir):
-                os.remove(os.path.join(tmp_dir, f))
-            os.rmdir(tmp_dir)
+            shutil.rmtree(tmp_dir, ignore_errors=True)
         except Exception:
             pass
 

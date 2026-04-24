@@ -55,6 +55,6 @@ async def _cmd_weather(event: MessageEvent):
         await weather_cmd.finish("...天气查询超时了，换个时间试试。")
     except Exception as e:
         logger.error(f"[天气] 查询失败: {e}")
-        await weather_cmd.finish(f"...天气查询失败了，稍后再试试吧。（{e}）")
+        await weather_cmd.finish("...天气查询失败了，稍后再试试吧。")
 
 weather_cmd = _register("天气", _cmd_weather, aliases=["weather"])

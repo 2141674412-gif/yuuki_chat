@@ -248,7 +248,7 @@ async def _cmd_status(event: MessageEvent):
             import psutil
             mem = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
             status.append(f"内存: {mem:.0f}MB")
-        except:
+        except Exception:
             pass
 
         # 运行时间
@@ -257,7 +257,7 @@ async def _cmd_status(event: MessageEvent):
             if _start_time:
                 u = time.time() - _start_time
                 status.append(f"运行: {int(u//3600)}h{int((u%3600)//60)}m")
-        except:
+        except Exception:
             pass
 
         status.append(f"群: {len(ALLOWED_GROUPS)}")

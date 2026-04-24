@@ -24,6 +24,8 @@ NoneBot2 插件，基于 Ollama 本地 AI 的聊天机器人
   maimai.py   - 舞萌DX查询（B50/B40/单曲）
 """
 
+import time
+
 from nonebot import get_driver, logger
 from . import chat
 from . import commands_base

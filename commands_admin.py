@@ -85,7 +85,7 @@ async def _cmd_restart(event: MessageEvent):
         # 刷新所有文件缓冲区后退出
         sys.stdout.flush()
         sys.stderr.flush()
-        os._exit(0)
+        sys.exit(0)
     except OSError as e:
         await restart_cmd.finish(f"重启失败：{str(e)}")
 
