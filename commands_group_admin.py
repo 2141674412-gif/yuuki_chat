@@ -290,7 +290,7 @@ async def _cmd_set_welcome(event: MessageEvent):
         await _set_welcome_cmd.finish(
             f"...当前欢迎语：{_welcome_msg}\n"
             f"状态：{'开启' if _welcome_enabled else '关闭'}\n"
-            f"用法：/设置欢迎 欢迎内容（{nickname}代表新人昵称）\n"
+            f"用法：/设置欢迎 欢迎内容（{{nickname}}代表新人昵称）\n"
             f"      /设置欢迎 开启/关闭"
         )
         return

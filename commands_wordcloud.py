@@ -76,10 +76,11 @@ async def _cmd_wordcloud(event: MessageEvent):
     # 优先使用jieba分词（更准确）
     try:
         import jieba
-        jieba.setLogLevel(jieba.logging.INFO)
+        import logging
+        jieba.setLogLevel(logging.INFO)
         seg_list = jieba.cut_for_search(all_text)
         words = [w for w in seg_list if len(w) >= 2 and w not in _STOP_WORDS]
-    except ImportError:
+    except Exception:
         # jieba未安装，回退到简单2-gram
         zh_chunks = re.findall(r'[\u4e00-\u9fff]{2,}', all_text)
         for chunk in zh_chunks:

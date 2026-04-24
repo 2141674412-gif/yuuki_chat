@@ -343,7 +343,8 @@ async def _cmd_update(event: MessageEvent):
 
     # 4. SHA256验证（如果有digest）
     if remote_digest:
-        sha256 = hashlib.sha256(open(update_zip, "rb").read()).hexdigest()
+        with open(update_zip, "rb") as f:
+            sha256 = hashlib.sha256(f.read()).hexdigest()
         if sha256 != remote_digest:
             await _send("...签名验证失败！文件可能被篡改。")
             try:
