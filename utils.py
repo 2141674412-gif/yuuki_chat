@@ -245,16 +245,18 @@ async def download_cover(http_client, song_id, size=(100, 100)):
 
 # ── 全局共享 HTTP 客户端 ──────────────────────────────────────────
 _shared_http_client: httpx.AsyncClient | None = None
+_http_client_initialized = False
 
 def get_shared_http_client() -> httpx.AsyncClient:
     """获取全局共享的 HTTP 客户端（连接池复用）"""
-    global _shared_http_client
-    if _shared_http_client is None or _shared_http_client.is_closed:
+    global _shared_http_client, _http_client_initialized
+    if not _http_client_initialized or _shared_http_client is None or _shared_http_client.is_closed:
         _shared_http_client = httpx.AsyncClient(
             timeout=15.0,
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
             follow_redirects=True,
         )
+        _http_client_initialized = True
     return _shared_http_client
 
 
