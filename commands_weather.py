@@ -107,7 +107,7 @@ async def _fetch_weather(client, city: str) -> str:
 
 
 async def _cmd_weather(event: MessageEvent):
-    """天气查询：/天气 城市 或 /weather 城市"""
+    """天气查询：/天气 城市 或 /天气 省份 城市"""
     content = str(event.message).strip()
     for prefix in ["天气", "weather"]:
         if content.lower().startswith(prefix):
@@ -119,7 +119,12 @@ async def _cmd_weather(event: MessageEvent):
         user_id = str(event.user_id)
         city = _get_user_weather_city(user_id)
         if not city:
-            await weather_cmd.finish("...要查哪个城市的天气？\n用法：/天气 城市\n      /我的天气 城市（绑定后直接/天气即可）")
+            await weather_cmd.finish(
+                "...要查哪个城市的天气？\n"
+                "用法：/天气 深圳\n"
+                "      /天气 广东深圳（同名城市加省份区分）\n"
+                "      /我的天气 城市（绑定后直接/天气即可）"
+            )
             return
     else:
         city = content
@@ -344,7 +349,7 @@ async def _cmd_my_weather(event: MessageEvent):
     # 绑定
     _weather_binds[user_id] = {"city": content}
     _save_weather_binds(_weather_binds)
-    await my_weather_cmd.finish(f"...已绑定天气城市：{content}\n以后直接发 /天气 就能查了。")
+    await my_weather_cmd.finish(f"...已绑定天气城市：{content}\n以后直接发 /天气 就能查了。\n提示：同名城市可加省份，如 /我的天气 广东深圳")
 
 
 weather_cmd = _register("天气", _cmd_weather, aliases=["weather"])
