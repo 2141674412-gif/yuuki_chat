@@ -18,7 +18,8 @@ _WEATHER_TTL = 600  # 10分钟缓存
 
 # 天气绑定文件
 _WEATHER_BINDS_FILE = os.path.join(_DATA_DIR, "weather_binds.json")
-# {group_id: {"city": "北京", "hour": 8, "minute": 0}}
+# 群绑定: {group_id: {"city": "北京", "hour": 8, "minute": 0}}
+# 个人绑定: {user_id: {"city": "上海"}}
 
 def _load_weather_binds() -> dict:
     return _load_json(_WEATHER_BINDS_FILE) or {}
@@ -29,10 +30,18 @@ def _save_weather_binds(binds: dict):
 _weather_binds = _load_weather_binds()
 
 
+def _get_user_weather_city(user_id: str) -> str:
+    """获取个人绑定的天气城市"""
+    bind = _weather_binds.get(user_id)
+    if bind and isinstance(bind, dict) and "city" in bind:
+        return bind["city"]
+    return ""
+
+
 async def _fetch_weather(client, city: str) -> str:
     """获取天气信息，返回格式化文本"""
     resp = await client.get(
-        f"https://wttr.in/{quote(city)}?format=j1",
+        f"https://wttr.in/{quote(city)}?format=j1&lang=zh",
         headers={"User-Agent": "curl/7.68.0"},
         timeout=10.0,
     )
@@ -68,12 +77,12 @@ async def _fetch_weather(client, city: str) -> str:
 
     # 降雨提醒
     rain_alert = ""
-    for h in hourly[:8]:  # 未来8小时
+    for h in hourly[:8]:  # 未来几个时段
         rain_chance = int(h.get("chanceofrain", "0"))
         if rain_chance >= 60:
             hour = int(h.get("time", "0")) // 100
-            rain_desc = h.get("lang_zh", [{}])[0].get("value", "有雨")
-            rain_alert = f"\n⚠️ {hour:02d}:00 降雨概率{rain_chance}%（{rain_desc}），记得带伞！"
+            rain_desc = h.get("lang_zh", [{}])[0].get("value", h.get("weatherDesc", [{}])[0].get("value", "有雨"))
+            rain_alert = f"\n☔ {hour:02d}:00 降雨概率{rain_chance}%（{rain_desc}），记得带伞！"
             break
 
     lines = [
@@ -104,10 +113,14 @@ async def _cmd_weather(event: MessageEvent):
             break
 
     if not content:
-        await weather_cmd.finish("...要查哪个城市的天气？用法：/天气 城市")
-        return
-
-    city = content
+        # 没输入城市，检查个人绑定
+        user_id = str(event.user_id)
+        city = _get_user_weather_city(user_id)
+        if not city:
+            await weather_cmd.finish("...要查哪个城市的天气？\n用法：/天气 城市\n      /我的天气 城市（绑定后直接/天气即可）")
+            return
+    else:
+        city = content
 
     # 检查天气缓存
     if city in _weather_cache:
@@ -297,6 +310,40 @@ def _restore_weather_jobs():
 
 _restore_weather_jobs()
 
+async def _cmd_my_weather(event: MessageEvent):
+    """个人天气绑定：/我的天气 城市"""
+    content = str(event.message).strip()
+    for prefix in ["我的天气", "myweather", "setcity"]:
+        if content.lower().startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+
+    user_id = str(event.user_id)
+
+    if not content:
+        city = _get_user_weather_city(user_id)
+        if city:
+            await my_weather_cmd.finish(f"...你绑定的城市是：{city}\n用法：/我的天气 城市（重新绑定）\n      /我的天气 取消")
+        else:
+            await my_weather_cmd.finish("...你还没绑定天气城市。\n用法：/我的天气 城市")
+        return
+
+    if content in ("取消", "删除", "清除"):
+        if user_id in _weather_binds:
+            del _weather_binds[user_id]
+            _save_weather_binds(_weather_binds)
+            await my_weather_cmd.finish("...已取消天气绑定。")
+        else:
+            await my_weather_cmd.finish("...你还没绑定天气城市。")
+        return
+
+    # 绑定
+    _weather_binds[user_id] = {"city": content}
+    _save_weather_binds(_weather_binds)
+    await my_weather_cmd.finish(f"...已绑定天气城市：{content}\n以后直接发 /天气 就能查了。")
+
+
 weather_cmd = _register("天气", _cmd_weather, aliases=["weather"])
 weather_bind_cmd = _register("绑定天气", _cmd_weather_bind, aliases=["bindweather"], admin_only=True)
 weather_unbind_cmd = _register("解绑天气", _cmd_weather_unbind, aliases=["unbindweather"], admin_only=True)
+my_weather_cmd = _register("我的天气", _cmd_my_weather, aliases=["myweather", "setcity"])
