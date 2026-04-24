@@ -267,13 +267,13 @@ def _register(name, handler, aliases=None, priority=5, admin_only=False):
     async def _safe_handler(event: MessageEvent):
         # 群白名单检查（默认不允许任何群，必须手动添加）
         from .config import ALLOWED_GROUPS
+        gid = getattr(event, 'group_id', None)
         if not ALLOWED_GROUPS:
-            gid = getattr(event, 'group_id', None)
             if gid:
                 return  # 没有配置白名单，所有群都不可用
         else:
-            gid = getattr(event, 'group_id', None)
             if gid and gid not in ALLOWED_GROUPS:
+                logger.debug(f"[命令] 群 {gid} 不在白名单，忽略")
                 return  # 不在白名单群里，静默忽略
         if admin_only and not check_superuser(str(event.user_id)):
             await cmd.finish("...你不是管理员。")

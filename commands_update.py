@@ -283,6 +283,7 @@ def _do_restart(user_id, event):
 async def _cmd_update(event: MessageEvent):
     """自动更新插件"""
     user_id = str(event.user_id)
+    logger.info(f"[更新] 收到更新请求 from {user_id}")
 
     # 检查锁
     if os.path.exists(_UPDATE_LOCK):
