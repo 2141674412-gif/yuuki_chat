@@ -60,21 +60,23 @@ async def _cmd_diagnose(event: MessageEvent):
     # 3. 配置检查
     report.append("【配置检查】")
     try:
-        from .config import (
-            API_KEY, API_BASE, MODEL_NAME, ALLOWED_GROUPS,
-            DEFAULT_GROUP, SUPERUSERS, _PLUGIN_DIR
-        )
+        from .config import ALLOWED_GROUPS, DEFAULT_GROUP, SUPERUSERS, _PLUGIN_DIR
         report.append(f"  插件目录: {_PLUGIN_DIR}")
 
-        # API配置
-        if API_KEY:
-            report.append(f"  API Key: {'*' * 8}...{API_KEY[-4:]}")
-        else:
-            report.append(f"  API Key: ❌ 未配置")
-            issues.append("API_KEY 未配置")
-
-        report.append(f"  API Base: {API_BASE}")
-        report.append(f"  模型: {MODEL_NAME}")
+        # API配置（从chat.py的_cfg读取）
+        try:
+            from .chat import _cfg
+            api_key = _cfg("api_key", "")
+            api_base = _cfg("api_base", "")
+            model_name = _cfg("model_name", "")
+            if api_key and api_key != "ollama":
+                report.append(f"  API Key: {'*' * 8}...{api_key[-4:]}")
+            else:
+                report.append(f"  API Key: {api_key or '未配置'}")
+            report.append(f"  API Base: {api_base}")
+            report.append(f"  模型: {model_name}")
+        except Exception as e:
+            report.append(f"  API配置: 读取失败 ({e})")
         report.append(f"  白名单群: {ALLOWED_GROUPS}")
         report.append(f"  超级管理员: {SUPERUSERS}")
 
@@ -109,7 +111,7 @@ async def _cmd_diagnose(event: MessageEvent):
     report.append("【网络检查】")
     try:
         from .utils import get_shared_http_client
-        client = await get_shared_http_client()
+        client = get_shared_http_client()
 
         # 测试 GitHub API
         try:
@@ -273,7 +275,7 @@ diagnose_cmd = _register("诊断", _cmd_diagnose, aliases=["自检", "diag"], pr
 async def _cmd_status(event: MessageEvent):
     """快速状态检查"""
     try:
-        from .config import API_KEY, MODEL_NAME, ALLOWED_GROUPS
+        from .config import ALLOWED_GROUPS
         from .utils import get_shared_http_client
 
         status = []
@@ -281,19 +283,21 @@ async def _cmd_status(event: MessageEvent):
         status.append("─" * 20)
 
         # API状态
-        if API_KEY:
-            try:
-                client = await get_shared_http_client()
-                from .config import API_BASE
-                resp = await client.get(f"{API_BASE.rstrip('/v1')}/models", timeout=5.0)
+        try:
+            from .chat import _cfg
+            api_key = _cfg("api_key", "")
+            api_base = _cfg("api_base", "")
+            if api_key and api_key != "ollama":
+                client = get_shared_http_client()
+                resp = await client.get(f"{api_base.rstrip('/v1')}/models", timeout=5.0)
                 if resp.status_code in (200, 401, 403):
                     status.append(f"AI: ✅ 正常")
                 else:
                     status.append(f"AI: ⚠️ {resp.status_code}")
-            except Exception as e:
-                status.append(f"AI: ❌ {type(e).__name__}")
-        else:
-            status.append("AI: ❌ 未配置")
+            else:
+                status.append(f"AI: {'✅ Ollama' if api_key == 'ollama' else '❌ 未配置'}")
+        except Exception as e:
+            status.append(f"AI: ❌ {type(e).__name__}")
 
         # 内存
         try:
