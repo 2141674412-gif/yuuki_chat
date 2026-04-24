@@ -1451,38 +1451,42 @@ async def handle_mai_plate(event: MessageEvent):
             ("全版本", "FS", "舞舞舞"),
         ]
 
-        # 6. 计算每个牌子进度
-        msg = f"版本牌子进度\n━━━━━━━━━━━━━━\n"
+        # 6. 按代分组计算牌子进度
+        msg = "版本牌子进度\n━━━━━━━━━━━━━━\n"
         total_plates = len(PLATE_DEFS) + len(ALL_PLATES)
         done_plates = 0
 
-        # 普通版本牌子
-        for ver, req_type, plate_name in PLATE_DEFS:
-            songs = version_songs.get(ver, [])
-            done, total = check_plate(songs, req_type)
-            if total == 0:
-                msg += f"[-] {plate_name}（{ver}）无数据\n"
-            elif done >= total:
-                done_plates += 1
-                msg += f"[OK] {plate_name}（{ver}）\n"
-            else:
-                msg += f"[X] {plate_name}（{ver}）{done}/{total}\n"
+        # 按版本分组显示
+        from itertools import groupby
+        sorted_plates = sorted(PLATE_DEFS, key=lambda x: x[0])
+        for ver, group in groupby(sorted_plates, key=lambda x: x[0]):
+            msg += f"【{ver}】\n"
+            for _, req_type, plate_name in group:
+                songs = version_songs.get(ver, [])
+                done, total = check_plate(songs, req_type)
+                if total == 0:
+                    msg += f"  [-] {plate_name} 无数据\n"
+                elif done >= total:
+                    done_plates += 1
+                    msg += f"  [✓] {plate_name} {done}/{total}\n"
+                else:
+                    msg += f"  [ ] {plate_name} {done}/{total}\n"
 
         # 全版本牌子
         all_song_list = []
         for ver_songs in version_songs.values():
             all_song_list.extend(ver_songs)
 
-        msg += "━━━━━━━━━━━━━━\n"
+        msg += "━━━━━━━━━━━━━━\n【全版本】\n"
         for ver, req_type, plate_name in ALL_PLATES:
             done, total = check_plate(all_song_list, req_type)
             if total == 0:
-                msg += f"[-] {plate_name}（{ver}）无数据\n"
+                msg += f"  [-] {plate_name} 无数据\n"
             elif done >= total:
                 done_plates += 1
-                msg += f"[OK] {plate_name}（{ver}）\n"
+                msg += f"  [✓] {plate_name} {done}/{total}\n"
             else:
-                msg += f"[X] {plate_name}（{ver}）{done}/{total}\n"
+                msg += f"  [ ] {plate_name} {done}/{total}\n"
 
         msg += f"━━━━━━━━━━━━━━\n进度：{done_plates}/{total_plates}"
         if done_plates == total_plates:

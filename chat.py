@@ -562,13 +562,94 @@ async def handle_qrcode(event: MessageEvent):
 
 _img_chat = on_message(priority=4, block=False)
 
-_IMG_SYSTEM_PROMPT = """你是结城希亚，有人发了一张图片给你看。请用1-2句话描述你看到了什么，并给出自然的反应。
-要求：
-- 像日常聊天一样，不要列举
-- 保持希亚的性格：傲娇、偶尔中二
-- 如果图片是可爱的东西（猫、甜食等），会不自觉开心
-- 如果图片很奇怪，会吐槽
-- 不要用markdown"""
+# 最大图片尺寸（像素），超过会压缩
+_MAX_IMAGE_SIZE = 1024
+# 最大图片文件大小（字节），超过会压缩
+_MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2MB
+# 最大图片数量
+_MAX_IMAGES = 5
+
+_IMG_SYSTEM_PROMPT = """你是结城希亚，有人发了图片给你看。请仔细观察图片并给出自然的反应。
+
+观察要点：
+1. 图片主体是什么（人物、动物、物品、场景等）
+2. 图片中的文字内容（如果有，请完整转述）
+3. 图片的氛围和情感
+4. 有趣或值得注意的细节
+
+回复要求：
+- 用2-3句话描述你看到的，像日常聊天一样自然
+- 如果图片有文字，请把文字内容说出来
+- 保持希亚的性格：傲娇、偶尔中二、喜欢甜食和猫
+- 看到可爱的东西会不自觉开心，看到奇怪的会吐槽
+- 不要用markdown格式"""
+
+
+def _compress_image(img_data: bytes, max_size: int = _MAX_IMAGE_SIZE, max_bytes: int = _MAX_IMAGE_BYTES) -> bytes:
+    """压缩图片：如果超过尺寸或大小限制，按比例缩小"""
+    if len(img_data) <= max_bytes:
+        # 检查尺寸
+        try:
+            img = Image.open(BytesIO(img_data))
+            if max(img.size) <= max_size:
+                return img_data
+        except Exception:
+            return img_data
+
+    try:
+        img = Image.open(BytesIO(img_data))
+        # 转换为RGB（处理PNG透明通道）
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+
+        # 计算缩放比例
+        scale = 1.0
+        if max(img.size) > max_size:
+            scale = min(scale, max_size / max(img.size))
+
+        # 按文件大小进一步缩放
+        if len(img_data) > max_bytes:
+            size_scale = (max_bytes / len(img_data)) ** 0.5
+            scale = min(scale, size_scale)
+
+        if scale < 1.0:
+            new_size = (int(img.width * scale), int(img.height * scale))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+        output = BytesIO()
+        img.save(output, format='JPEG', quality=85)
+        return output.getvalue()
+    except Exception:
+        return img_data
+
+
+def _extract_gif_frames(img_data: bytes, max_frames: int = 3) -> list:
+    """从GIF中提取关键帧"""
+    frames = []
+    try:
+        img = Image.open(BytesIO(img_data))
+        if not getattr(img, 'is_animated', False):
+            return [img_data]
+
+        total_frames = getattr(img, 'n_frames', 1)
+        if total_frames <= max_frames:
+            indices = range(total_frames)
+        else:
+            # 均匀采样
+            indices = [int(i * (total_frames - 1) / (max_frames - 1)) for i in range(max_frames)]
+
+        for idx in indices:
+            img.seek(idx)
+            frame = img.copy()
+            if frame.mode in ('RGBA', 'P'):
+                frame = frame.convert('RGB')
+            output = BytesIO()
+            frame.save(output, format='JPEG', quality=85)
+            frames.append(output.getvalue())
+        return frames
+    except Exception:
+        return [img_data]
+
 
 @_img_chat.handle()
 async def handle_image_chat(event: MessageEvent):
@@ -592,36 +673,62 @@ async def handle_image_chat(event: MessageEvent):
     # 提取纯文本（去掉@标记）
     plain = re.sub(r'\[at:qq=\d+\]', '', str(event.message)).strip()
 
-    # 下载第一张图片
-    img_url = ""
+    # 收集所有图片URL（最多5张）
+    img_urls = []
     for seg in event.message:
         if seg.type == "image":
-            img_url = seg.data.get("url", "")
-            break
+            img_urls.append(seg.data.get("url", ""))
+            if len(img_urls) >= _MAX_IMAGES:
+                break
 
-    if not img_url:
+    if not img_urls:
         return
 
     try:
-        # 下载图片
-        resp = await _get_http_client().get(img_url)
-        if resp.status_code != 200:
-            return
-        img_data = resp.content
+        # 下载并处理所有图片
+        images_b64 = []
+        for img_url in img_urls:
+            resp = await _get_http_client().get(img_url, timeout=10.0)
+            if resp.status_code != 200:
+                continue
+            img_data = resp.content
 
-        # 使用视觉模型（默认 glm-4v-flash，可通过 VISION_MODEL 配置）
+            # 检查是否是GIF
+            is_gif = img_url.lower().endswith('.gif') or img_data[:4] == b'GIF8'
+
+            if is_gif:
+                # 提取GIF关键帧
+                frames = _extract_gif_frames(img_data)
+                for frame_data in frames:
+                    frame_data = _compress_image(frame_data)
+                    images_b64.append(base64.b64encode(frame_data).decode("utf-8"))
+            else:
+                # 压缩普通图片
+                img_data = _compress_image(img_data)
+                images_b64.append(base64.b64encode(img_data).decode("utf-8"))
+
+        if not images_b64:
+            return
+
+        # 使用视觉模型
         vision_model = _cfg("vision_model", "glm-4v-flash")
         client = _get_client()
-        # 将图片转为 base64
-        img_b64 = base64.b64encode(img_data).decode("utf-8")
 
+        # 构建消息内容
         user_content = []
+
+        # 添加文字说明
+        if len(images_b64) > 1:
+            user_content.append({"type": "text", "text": f"（共{len(images_b64)}张图片）"})
         if plain:
             user_content.append({"type": "text", "text": plain})
-        user_content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
-        })
+
+        # 添加所有图片
+        for img_b64 in images_b64:
+            user_content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
+            })
 
         loop = asyncio.get_running_loop()
 
@@ -632,9 +739,9 @@ async def handle_image_chat(event: MessageEvent):
                     {"role": "system", "content": _IMG_SYSTEM_PROMPT},
                     {"role": "user", "content": user_content},
                 ],
-                max_tokens=int(_cfg("max_tokens", "128")),
+                max_tokens=int(_cfg("max_tokens", "256")),  # 多图需要更多token
                 temperature=float(_cfg("temperature", "0.7")),
-                timeout=15.0
+                timeout=30.0  # 多图需要更长超时
             )
 
         response = await loop.run_in_executor(None, _do_vision)
@@ -644,8 +751,8 @@ async def handle_image_chat(event: MessageEvent):
         if reply:
             await _img_chat.finish(reply)
     except Exception as e:
-        # 模型不支持视觉或请求失败，静默忽略（让二维码handler或其他处理）
-        logger.debug(f"[图片理解] 失败（模型可能不支持视觉）: {type(e).__name__}: {str(e)[:80]}")
+        # 模型不支持视觉或请求失败，静默忽略
+        logger.debug(f"[图片理解] 失败: {type(e).__name__}: {str(e)[:100]}")
 
 
 # ========== 定时主动发言 ==========
