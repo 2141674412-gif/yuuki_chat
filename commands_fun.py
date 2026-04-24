@@ -8,13 +8,11 @@ import os
 import random
 import re
 import time
-import asyncio
 from datetime import datetime
 
 # 第三方库
 from nonebot import on_command, logger
 from nonebot.adapters.onebot.v11 import MessageEvent
-from nonebot.exception import FinishedException
 
 # 基础模块
 from .commands_base import (

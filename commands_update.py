@@ -1,13 +1,9 @@
 # ========== 自动更新 ==========
 
 # 标准库
-import asyncio
-import base64
 import hashlib
 import json
-import logging
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -16,7 +12,6 @@ import zipfile
 from datetime import datetime
 
 # 第三方库
-import httpx
 from nonebot import logger
 from nonebot.adapters.onebot.v11 import MessageEvent
 from nonebot.exception import FinishedException

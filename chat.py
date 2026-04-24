@@ -18,7 +18,7 @@ from PIL import Image
 from qreader import QReader
 
 # 本地模块
-from .config import ALLOWED_GROUPS, COMMAND_NAMES, load_persona
+from .config import ALLOWED_GROUPS, COMMAND_NAMES, load_persona, DATA_DIR
 from .commands_sticker import get_sticker_message
 
 # ========== 配置读取（兼容 .env 大写和 section 两种格式） ==========
@@ -120,12 +120,6 @@ def _cleanup_old_histories():
     for uid in expired_users:
         chat_history.pop(uid, None)
         _history_timestamps.pop(uid, None)
-
-
-def _get_scheduler():
-    """延迟导入 APScheduler，避免插件加载时硬依赖。"""
-    from nonebot_plugin_apscheduler import scheduler
-    return scheduler
 
 
 # 将命令列表转为集合，加速查找
@@ -658,9 +652,8 @@ AUTO_CHAT_MIN_INTERVAL = 30 * 60   # 30分钟
 AUTO_CHAT_MAX_INTERVAL = 60 * 60   # 60分钟
 
 # 自动发言时间记录文件（用于重启冷却）
-_DATA_DIR = os.path.join(os.getcwd(), "yuuki_data")
-os.makedirs(_DATA_DIR, exist_ok=True)
-_AUTO_CHAT_TIME_FILE = os.path.join(_DATA_DIR, "last_auto_chat.txt")
+os.makedirs(DATA_DIR, exist_ok=True)
+_AUTO_CHAT_TIME_FILE = os.path.join(DATA_DIR, "last_auto_chat.txt")
 
 # 需要主动发言的群（从环境变量读取，格式: 群号1,群号2）
 _auto_chat_groups = []
@@ -768,6 +761,7 @@ async def on_bot_startup():
     """bot 启动后启动自动发言任务 + 注册定时清理"""
     start_auto_chat()
     try:
+        from .commands_schedule import _get_scheduler
         _get_scheduler().add_job(
             _cleanup_old_histories,
             "interval",
