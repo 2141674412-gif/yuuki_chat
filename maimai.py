@@ -27,12 +27,18 @@ for p in _BADGE_SEARCH_PATHS:
         break
 
 _BADGE_IMAGES = {}  # key: "ap", "app", "fc", "fcp", "fs", "fsd", "fsdp", "fsp" → PIL Image
+_BADGES_LOADED = False
 
 # ---- 难度等级标签图片加载 ----
 _LEVEL_DIR = os.path.join(_PLUGIN_DIR, "assets", "levels")
 _LEVEL_IMAGES = {}  # key: "01"~"15", "07p"~"15p" → PIL Image
+_LEVELS_LOADED = False
 
 def _load_level_images():
+    global _LEVELS_LOADED
+    if _LEVELS_LOADED:
+        return
+    _LEVELS_LOADED = True
     if not os.path.isdir(_LEVEL_DIR):
         return
     for fname in os.listdir(_LEVEL_DIR):
@@ -43,13 +49,16 @@ def _load_level_images():
             except Exception:
                 pass
 
-_load_level_images()
-
 # ---- DX/SD 图标加载 ----
 _ICON_DIR = os.path.join(_PLUGIN_DIR, "assets", "icons")
 _ICON_IMAGES = {}  # key: "DX", "SD", "Master", "ReMaster" → PIL Image
+_ICONS_LOADED = False
 
 def _load_icon_images():
+    global _ICONS_LOADED
+    if _ICONS_LOADED:
+        return
+    _ICONS_LOADED = True
     if not os.path.isdir(_ICON_DIR):
         return
     for fname in os.listdir(_ICON_DIR):
@@ -60,15 +69,17 @@ def _load_icon_images():
             except Exception:
                 pass
 
-_load_icon_images()
-
 # ---- DX评分框和星星加载 ----
 _RATING_DIR = os.path.join(_PLUGIN_DIR, "assets", "rating")
 _DX_RATING_IMG = None  # DX评分框背景
 _STAR_IMAGES = {}  # key: "01"~"05" → PIL Image
+_RATING_LOADED = False
 
 def _load_rating_images():
-    global _DX_RATING_IMG
+    global _DX_RATING_IMG, _RATING_LOADED
+    if _RATING_LOADED:
+        return
+    _RATING_LOADED = True
     if not os.path.isdir(_RATING_DIR):
         return
     # DX评分框
@@ -87,10 +98,12 @@ def _load_rating_images():
             except Exception:
                 pass
 
-_load_rating_images()
-
 def _load_badges():
-    """启动时加载所有徽章图片"""
+    """按需加载徽章图片"""
+    global _BADGES_LOADED
+    if _BADGES_LOADED:
+        return
+    _BADGES_LOADED = True
     if not _BADGE_DIR:
         logger.warning("[徽章] 未找到 assets/badges 目录，将使用文字徽章")
         return
@@ -110,8 +123,6 @@ def _load_badges():
                 logger.warning(f"[徽章] 加载失败 {filename}: {e}")
         else:
             logger.debug(f"[徽章] 文件不存在: {path}")
-
-_load_badges()
 
 from .config import (
     MAIMAI_API, MAIMAI_MUSIC_API, MAIMAI_COVER_BASE, MAIMAI_VERSIONS,
@@ -300,6 +311,12 @@ async def get_music_data():
 
 async def generate_mai_image(data, is_b50=True):
     """生成舞萌 B50/B40 卡片图片（网格卡片布局）"""
+    # 首次使用时加载图片资源（延迟加载）
+    _load_level_images()
+    _load_icon_images()
+    _load_rating_images()
+    _load_badges()
+
     _t_start = time.time()
     nickname = data.get("nickname", "Unknown")
     rating = data.get("rating", 0)
