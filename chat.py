@@ -266,10 +266,10 @@ async def handle_chat(event: MessageEvent):
             {"role": "system", "content": system_prompt}
         ]
 
-    # 添加用户消息
-    chat_history[user_id].append({"role": "user", "content": message})
-
     try:
+        # 添加用户消息到历史
+        chat_history[user_id].append({"role": "user", "content": message})
+
         client = _get_client()
 
         # 流式请求（在线程中执行，避免阻塞事件循环）
@@ -340,15 +340,21 @@ async def handle_chat(event: MessageEvent):
     except APITimeoutError:
         # API 超时，尝试重建客户端连接
         _reconnect_client()
+        # 移除孤儿用户消息
+        if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
+            chat_history[user_id].pop()
         fallback = "嗯...正义的伙伴好像走神了，再说一次？"
-        # 错误不入历史，避免污染上下文
         await chat.finish(fallback)
     except APIError as e:
         # API 错误（如服务不可用、速率限制等）
+        if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
+            chat_history[user_id].pop()
         fallback = "唔...脑袋好像有点转不过来，等一下再来吧。"
         await chat.finish(fallback)
     except Exception as e:
         # 其他未预期的错误
+        if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
+            chat_history[user_id].pop()
         fallback = [
             "嗯？怎么了。",
             "...有事就说。",
@@ -359,7 +365,6 @@ async def handle_chat(event: MessageEvent):
         ]
 
         ai_response = random.choice(fallback)
-        # 错误不入历史
         await chat.finish(ai_response)
 
 

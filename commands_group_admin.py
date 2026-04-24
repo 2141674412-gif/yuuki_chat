@@ -177,6 +177,12 @@ async def _on_group_increase(bot: Bot, event: GroupIncreaseNoticeEvent):
         return
     if event.sub_type != "approve":
         return
+    # 不欢迎bot自己
+    try:
+        if event.user_id == bot.self_id:
+            return
+    except Exception:
+        pass
     from .config import ALLOWED_GROUPS
     if event.group_id not in ALLOWED_GROUPS:
         return
