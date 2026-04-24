@@ -199,8 +199,7 @@ def _load_blacklist() -> None:
 
 def _save_blacklist() -> None:
     try:
-        with open(BLACKLIST_FILE, "w", encoding="utf-8") as f:
-            json.dump(sorted(user_blacklist), f, ensure_ascii=False, indent=2)
+        _save_json(BLACKLIST_FILE, sorted(user_blacklist))
     except OSError as e:
         logger.error(f"[黑名单] 保存失败: {e}")
 

@@ -108,13 +108,20 @@ def _cleanup_group_chat_log():
     """清理超过 7 天的群消息记录"""
     now = time.time()
     cutoff = now - _GROUP_CHAT_LOG_TTL
+    total = 0
     for gid in list(_group_chat_log.keys()):
         _group_chat_log[gid] = [
             entry for entry in _group_chat_log[gid]
             if entry[0] > cutoff
         ]
+        total += len(_group_chat_log[gid])
         if not _group_chat_log[gid]:
             del _group_chat_log[gid]
+    # 全局条目上限保护
+    if total > 50000:
+        for gid in list(_group_chat_log.keys()):
+            if len(_group_chat_log[gid]) > 5000:
+                _group_chat_log[gid] = _group_chat_log[gid][-5000:]
 
 # 对话历史时间戳，用于定期清理
 _history_timestamps = {}
@@ -781,6 +788,9 @@ async def handle_image_chat(event: MessageEvent):
             img_desc += "]"
             chat_history[user_id].append({"role": "user", "content": img_desc})
             chat_history[user_id].append({"role": "assistant", "content": reply})
+            # 裁剪历史长度（保持system + 最近10轮）
+            if len(chat_history[user_id]) > 21:
+                chat_history[user_id] = [chat_history[user_id][0]] + chat_history[user_id][-20:]
             _history_timestamps[user_id] = time.time()
             await _img_chat.finish(reply)
     except Exception as e:
