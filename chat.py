@@ -768,7 +768,7 @@ async def handle_image_chat(event: MessageEvent):
             # 写入对话历史，使后续对话能引用图片内容
             user_id = str(event.user_id)
             if user_id not in chat_history:
-                chat_history[user_id] = [{"role": "system", "content": _get_persona_prompt()}]
+                chat_history[user_id] = [{"role": "system", "content": load_persona()}]
             # 记录用户发的图片（简要描述）
             img_desc = f"[用户发了{len(images_b64)}张图片"
             if plain:

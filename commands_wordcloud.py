@@ -42,7 +42,7 @@ async def _cmd_wordcloud(event: MessageEvent):
         if content.startswith(prefix):
             content = content[len(prefix):].strip()
             break
-    group_id = str(getattr(event, 'group_id', 0))
+    group_id = getattr(event, 'group_id', 0)
 
     # 从群消息记录中读取数据
     try:
