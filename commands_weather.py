@@ -7,6 +7,8 @@ import httpx
 from nonebot import logger, get_bot
 from nonebot.adapters.onebot.v11 import MessageEvent
 
+from nonebot.exception import FinishedException
+
 from .commands_base import _register, _get_http_client, _DATA_DIR, _load_json, _save_json
 from .commands_schedule import _get_scheduler
 
@@ -139,6 +141,8 @@ async def _cmd_weather(event: MessageEvent):
             del _weather_cache[oldest]
         _weather_cache[city] = {"text": weather_text, "time": time.time()}
         await weather_cmd.finish(weather_text)
+    except FinishedException:
+        raise
     except httpx.TimeoutException:
         await weather_cmd.finish("...天气查询超时了，换个时间试试。")
     except Exception as e:
