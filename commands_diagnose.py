@@ -60,15 +60,17 @@ async def _cmd_diagnose(event: MessageEvent):
     # 3. 配置检查
     report.append("【配置检查】")
     try:
-        from .config import ALLOWED_GROUPS, DEFAULT_GROUP, SUPERUSERS, _PLUGIN_DIR
+        from .config import ALLOWED_GROUPS, DEFAULT_GROUP, _PLUGIN_DIR
+        from .commands_base import superusers
         report.append(f"  插件目录: {_PLUGIN_DIR}")
 
-        # API配置（从chat.py的_cfg读取）
+        # API配置（直接从环境变量读取，避免循环导入）
         try:
-            from .chat import _cfg
-            api_key = _cfg("api_key", "")
-            api_base = _cfg("api_base", "")
-            model_name = _cfg("model_name", "")
+            from nonebot import get_driver
+            _driver_config = get_driver().config.dict()
+            api_key = _driver_config.get("api_key", "") or ""
+            api_base = _driver_config.get("api_base", "") or ""
+            model_name = _driver_config.get("model_name", "") or ""
             if api_key and api_key != "ollama":
                 report.append(f"  API Key: {'*' * 8}...{api_key[-4:]}")
             else:
@@ -78,7 +80,7 @@ async def _cmd_diagnose(event: MessageEvent):
         except Exception as e:
             report.append(f"  API配置: 读取失败 ({e})")
         report.append(f"  白名单群: {ALLOWED_GROUPS}")
-        report.append(f"  超级管理员: {SUPERUSERS}")
+        report.append(f"  超级管理员: {superusers}")
 
         if not ALLOWED_GROUPS:
             warnings.append("ALLOWED_GROUPS 为空，bot不会在任何群响应")
@@ -284,9 +286,10 @@ async def _cmd_status(event: MessageEvent):
 
         # API状态
         try:
-            from .chat import _cfg
-            api_key = _cfg("api_key", "")
-            api_base = _cfg("api_base", "")
+            from nonebot import get_driver
+            _driver_config = get_driver().config.dict()
+            api_key = _driver_config.get("api_key", "") or ""
+            api_base = _driver_config.get("api_base", "") or ""
             if api_key and api_key != "ollama":
                 client = get_shared_http_client()
                 resp = await client.get(f"{api_base.rstrip('/v1')}/models", timeout=5.0)
