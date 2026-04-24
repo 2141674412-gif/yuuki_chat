@@ -255,7 +255,7 @@ async def _cmd_update(event: MessageEvent):
             "commands_search.py", "commands_weather.py", "commands_wordcloud.py",
             "commands_admin.py", "commands_group_admin.py", "commands_update.py",
             "commands_schedule.py", "commands_backup.py", "commands_vault.py",
-            "commands_sticker.py",
+            "commands_sticker.py", "commands_remote.py",
         ]
         backup_ok = True
         for fname in _PY_FILES:

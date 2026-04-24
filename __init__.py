@@ -42,6 +42,7 @@ from . import commands_schedule
 from . import commands_backup
 from . import commands_vault
 from . import commands_sticker
+from . import commands_remote
 from . import maimai as mai_cmd
 
 __all__ = ["chat", "mai_cmd"]
