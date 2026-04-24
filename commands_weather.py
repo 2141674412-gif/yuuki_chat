@@ -150,9 +150,12 @@ async def _cmd_weather(event: MessageEvent):
         raise
     except httpx.TimeoutException:
         await weather_cmd.finish("...天气查询超时了，换个时间试试。")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[天气] HTTP错误: {e.response.status_code}")
+        await weather_cmd.finish(f"...天气服务返回错误（HTTP {e.response.status_code}），换个城市名试试。")
     except Exception as e:
         logger.error(f"[天气] 查询失败: {e}")
-        await weather_cmd.finish("...天气查询失败了，稍后再试试吧。")
+        await weather_cmd.finish(f"...天气查询失败了：{type(e).__name__}，稍后再试。")
 
 
 async def _cmd_weather_bind(event: MessageEvent):
