@@ -57,7 +57,7 @@ async def _cmd_help(event: MessageEvent):
   /签到 — 每日签到（+积分）
   /积分 — 查看积分（别名：我的积分、查积分）
   /排行 — 积分排行榜（别名：排行榜、排名）
-  /抽签 /运势 /成语 /笑话 /谜语 /戳我
+  /抽签 /运势 /成语 /笑话 /谜语 /戳我 /点歌
 
 工具
   /天气 城市 — 查询天气（别名：weather）
@@ -352,6 +352,7 @@ async def _cmd_test_commands(event: MessageEvent):
         ("人设", "用户"), ("重置", "用户"),
         ("签到", "用户"), ("抽签", "用户"), ("运势", "用户"),
         ("成语", "用户"), ("笑话", "用户"), ("谜语", "用户"), ("戳我", "用户"),
+        ("点歌", "用户"), ("music", "用户"), ("搜歌", "用户"),
         ("计算器", "用户"), ("翻译", "用户"), ("汇率", "用户"),
         ("搜索", "用户"), ("提醒", "用户"), ("历史", "用户"), ("取消提醒", "用户"),
         ("设置密码", "用户"), ("修改密码", "用户"),
@@ -591,10 +592,46 @@ async def _cmd_idiom(event: MessageEvent):
             break
     last_idiom = content
     idioms = [
+        # 原有20个
         "一心一意", "意气风发", "发愤图强", "强词夺理", "理直气壮",
         "壮志凌云", "云开雾散", "散兵游勇", "勇往直前", "前仆后继",
         "继往开来", "来龙去脉", "脉脉含情", "情投意合", "合二为一",
-        "一帆风顺", "顺水推舟", "舟车劳顿", "顿开茅塞", "塞翁失马"
+        "一帆风顺", "顺水推舟", "舟车劳顿", "顿开茅塞", "塞翁失马",
+        # 扩充
+        "马到成功", "功德无量", "量力而行", "行云流水", "水落石出",
+        "出人头地", "地大物博", "博大精深", "深入人心", "心花怒放",
+        "放虎归山", "山清水秀", "秀外慧中", "中流砥柱", "柱石之坚",
+        "坚持不懈", "懈怠不振", "振奋人心", "心旷神怡", "怡然自得",
+        "得心应手", "手到擒来", "来之不易", "易如反掌", "掌上明珠",
+        "珠联璧合", "合情合理", "理屈词穷", "穷途末路", "路不拾遗",
+        "遗臭万年", "年富力强", "强弩之末", "末路穷途", "途穷日暮",
+        "暮鼓晨钟", "钟鸣鼎食", "食不果腹", "腹背受敌", "敌众我寡",
+        "寡不敌众", "众志成城", "城下之盟", "盟山誓海", "海阔天空",
+        "空前绝后", "后来居上", "上下其手", "手忙脚乱", "乱七八糟",
+        "糟糠之妻", "妻离子散", "散沙一盘", "盘根错节", "节外生枝",
+        "枝繁叶茂", "茂林修竹", "竹篮打水", "水到渠成", "成竹在胸",
+        "胸有成竹", "竹报平安", "安居乐业", "业精于勤", "勤能补拙",
+        "拙口钝辞", "辞旧迎新", "新陈代谢", "谢天谢地", "地久天长",
+        "长驱直入", "入木三分", "分秒必争", "争分夺秒", "秒杀全场",
+        "场场爆满", "满腹经纶", "纶巾羽扇", "善始善终", "终成眷属",
+        "属垣有耳", "耳目一新", "新陈代谢", "谢天谢地", "地动山摇",
+        "摇摇欲坠", "坠入深渊", "渊远流长", "长篇大论", "论功行赏",
+        "赏心悦目", "目不暇接", "接二连三", "三思而行", "行若无事",
+        "事半功倍", "倍道而行", "行云流水", "水涨船高", "高瞻远瞩",
+        "瞩目光辉", "辉煌灿烂", "烂漫天真", "真知灼见", "见多识广",
+        "广开言路", "路见不平", "平步青云", "云淡风轻", "轻而易举",
+        "举一反三", "三令五申", "申冤昭雪", "雪中送炭", "炭火烧身",
+        "身体力行", "行善积德", "德高望重", "重见天日", "日新月异",
+        "异想天开", "开门见山", "山高水长", "长年累月", "月明星稀",
+        "稀世珍宝", "宝刀不老", "老马识途", "途穷日暮", "暮气沉沉",
+        "沉默寡言", "言传身教", "教学相长", "长话短说", "说一不二",
+        "二话不说", "说三道四", "四面楚歌", "歌舞升平", "平分秋色",
+        "色厉内荏", "荏苒光阴", "阴差阳错", "错综复杂", "杂乱无章",
+        "章法有度", "度日如年", "年高德劭", "劭德日新", "新陈代谢",
+        "谢庭兰玉", "玉洁冰清", "清心寡欲", "欲罢不能", "能工巧匠",
+        "匠心独运", "运筹帷幄", "握手言欢", "欢天喜地", "地老天荒",
+        "荒诞不经", "经久不息", "息事宁人", "人山人海", "海纳百川",
+        "川流不息", "息息相关", "关门打狗", "狗急跳墙", "墙头草",
     ]
     if last_idiom:
         matching = [i for i in idioms if i[0] == last_idiom[-1]]
@@ -604,3 +641,61 @@ async def _cmd_idiom(event: MessageEvent):
     await idiom_cmd.finish(f"好，我先来。{random.choice(idioms)}。接吧。")
 
 idiom_cmd = _register("成语", _cmd_idiom)
+
+
+# ========== 点歌 ==========
+
+async def _cmd_music(event: MessageEvent):
+    """点歌：搜索歌曲返回链接"""
+    content = str(event.message).strip()
+    for prefix in ["点歌"]:
+        if content.startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+
+    if not content:
+        await music_cmd.finish("...想听什么歌？告诉我歌名。")
+
+    await music_cmd.send(f"...在找「{content}」...")
+
+    try:
+        from .utils import get_shared_http_client
+        client = get_shared_http_client()
+
+        # 使用网易云搜索API
+        resp = await client.get(
+            "https://music.163.com/api/search/get",
+            params={"s": content, "type": 1, "offset": 0, "limit": 3},
+            headers={"Referer": "https://music.163.com/", "User-Agent": "Mozilla/5.0"},
+            timeout=10.0,
+        )
+
+        if resp.status_code != 200:
+            await music_cmd.finish("...搜索失败了，换个关键词试试？")
+            return
+
+        data = resp.json()
+        result = data.get("result", {})
+        songs = result.get("songs", [])
+
+        if not songs:
+            await music_cmd.finish(f"...没找到「{content}」，换个名字试试？")
+            return
+
+        lines = [f"🎵 搜索「{content}」结果："]
+        for i, song in enumerate(songs[:3], 1):
+            name = song.get("name", "未知")
+            artists = "、".join(a.get("name", "") for a in song.get("artists", []))
+            song_id = song.get("id", "")
+            # 网易云外链
+            url = f"https://music.163.com/song/media/outer/url?id={song_id}"
+            lines.append(f"{i}. {name} — {artists}")
+            lines.append(f"   {url}")
+
+        await music_cmd.finish("\n".join(lines))
+
+    except Exception as e:
+        logger.debug(f"[点歌] 搜索失败: {type(e).__name__}")
+        await music_cmd.finish("...搜索出错了，稍后再试。")
+
+music_cmd = _register("点歌", _cmd_music, aliases=["music", "搜歌"])

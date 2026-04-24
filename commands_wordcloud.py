@@ -71,20 +71,24 @@ async def _cmd_wordcloud(event: MessageEvent):
         await wordcloud_cmd.finish(f"...最近{days}天没有群聊天记录可以统计。")
         return
 
-    # 分词：中文按连续汉字（2字及以上），英文按空格
+    # 分词
     words = []
-    # 提取中文词（连续2个以上汉字）
-    zh_chunks = re.findall(r'[\u4e00-\u9fff]{2,}', all_text)
-    for chunk in zh_chunks:
-        # 简单的2-gram分词
-        for i in range(len(chunk) - 1):
-            words.append(chunk[i:i+2])
-    # 提取英文词
-    en_chunks = re.findall(r'[a-zA-Z]{2,}', all_text)
-    for chunk in en_chunks:
-        words.append(chunk.lower())
-    # 过滤停用词
-    words = [w for w in words if w not in _STOP_WORDS]
+    # 优先使用jieba分词（更准确）
+    try:
+        import jieba
+        jieba.setLogLevel(jieba.logging.INFO)
+        seg_list = jieba.cut_for_search(all_text)
+        words = [w for w in seg_list if len(w) >= 2 and w not in _STOP_WORDS]
+    except ImportError:
+        # jieba未安装，回退到简单2-gram
+        zh_chunks = re.findall(r'[\u4e00-\u9fff]{2,}', all_text)
+        for chunk in zh_chunks:
+            for i in range(len(chunk) - 1):
+                words.append(chunk[i:i+2])
+        en_chunks = re.findall(r'[a-zA-Z]{2,}', all_text)
+        for chunk in en_chunks:
+            words.append(chunk.lower())
+        words = [w for w in words if w not in _STOP_WORDS]
     if not words:
         await wordcloud_cmd.finish("...聊天内容太少，统计不出什么来。")
         return
