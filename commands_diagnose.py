@@ -54,18 +54,24 @@ def _check_code_bugs():
             bugs.append(f"❌ {fname} 第{e.lineno}行: SyntaxError: {e.msg}")
             continue
 
-        # 2. global 声明位置检查（必须在函数开头）
+        # 2. global 声明位置检查（必须在函数开头，忽略docstring和注释）
         for i, line in enumerate(lines, 1):
             stripped = line.strip()
             if stripped.startswith("global "):
-                # 检查前面是否有非空非注释非global行
-                for j in range(i - 2, max(i - 20, -1), -1):
+                # 向上查找，跳过空行、注释、docstring、其他global
+                for j in range(i - 2, max(i - 30, -1), -1):
                     prev = lines[j].strip()
                     if not prev or prev.startswith("#") or prev.startswith("global "):
                         continue
+                    # 跳过 docstring（三引号字符串）
+                    if prev.startswith('"""') or prev.startswith("'''") or prev.endswith('"""') or prev.endswith("'''"):
+                        continue
                     if prev.startswith("def ") or prev.startswith("async def "):
                         break
-                    # global 前有其他语句
+                    # 跳过类型注解（-> xxx:）
+                    if prev.startswith("->") or prev.startswith(") ->") or prev.endswith(":"):
+                        continue
+                    # global 前有实际代码语句
                     bugs.append(f"⚠️ {fname} 第{i}行: global 声明不在函数开头（前面有代码）")
                     break
 
@@ -73,18 +79,39 @@ def _check_code_bugs():
         for i, line in enumerate(lines, 1):
             stripped = line.strip()
             if 'f"' in stripped or "f'" in stripped:
-                # 简单检查：在 f-string 中是否有 {nickname} 这种可能未定义的
                 import re
                 fstring_vars = re.findall(r'\{([a-zA-Z_]\w*)\}', stripped)
                 for var in fstring_vars:
-                    # 常见误用：{nickname} 应该是 {{nickname}}
                     if var in ("nickname",) and f"{{{var}}}" not in stripped:
                         bugs.append(f"⚠️ {fname} 第{i}行: f-string 中 '{var}' 可能未定义，需要用 '{{{var}}}' 转义")
 
-        # 4. 检查 except 是否遗漏 FinishedException
+        # 4. 检查 except Exception 是否遗漏 FinishedException
+        # 只检查包含 .finish() 或 .send() 的函数（这些才会抛出 FinishedException）
+        # 先找出哪些函数调用了 finish/send
+        finish_functions = set()
+        for i, line in enumerate(lines, 1):
+            if ".finish(" in line or ".send(" in line:
+                # 找到这个函数的范围
+                func_start = -1
+                for j in range(i - 1, max(i - 50, -1), -1):
+                    if lines[j].strip().startswith("def ") or lines[j].strip().startswith("async def "):
+                        func_start = j + 1
+                        break
+                if func_start > 0:
+                    finish_functions.add(func_start)
+
         for i, line in enumerate(lines, 1):
             stripped = line.strip()
             if stripped.startswith("except Exception"):
+                # 找到这个 except 所在的函数起始行
+                func_start = -1
+                for j in range(i - 1, max(i - 50, -1), -1):
+                    if lines[j].strip().startswith("def ") or lines[j].strip().startswith("async def "):
+                        func_start = j + 1
+                        break
+                # 只检查调用了 finish/send 的函数
+                if func_start not in finish_functions:
+                    continue
                 # 检查前面是否有 except FinishedException
                 found_finished = False
                 for j in range(i - 2, max(i - 10, -1), -1):
@@ -93,9 +120,7 @@ def _check_code_bugs():
                         break
                     if "try:" in lines[j] or "except" in lines[j]:
                         continue
-                # 检查文件是否导入了 FinishedException
                 if not found_finished and "FinishedException" in source:
-                    # 检查是否在同一个函数内
                     bugs.append(f"⚠️ {fname} 第{i}行: except Exception 可能吞掉 FinishedException")
 
         # 5. 检查 open() 没有 with 语句
