@@ -33,6 +33,7 @@ async def _search_ddg(query):
             results.append(f"【{heading}】\n{abstract}")
             if url:
                 results.append(f"🔗 {url}")
+        # 相关主题（取前3个有文本的，过滤分类链接）
         count = 0
         for topic in related:
             if count >= 3:
@@ -40,6 +41,9 @@ async def _search_ddg(query):
             text = topic.get("Text", "").strip()
             link = topic.get("FirstURL", "").strip()
             if text:
+                # 过滤DuckDuckGo分类链接（不太有用）
+                if link and "/c/" in link:
+                    continue
                 results.append(f"• {text}")
                 if link:
                     results.append(f"  🔗 {link}")
@@ -208,7 +212,7 @@ async def _cmd_search(event: MessageEvent):
             logger.warning(f"[搜索失败] {fn.__name__}: {e}")
             return None
 
-    search_fns = [_search_ddg, _search_wiki, _search_bing, _search_baidu]
+    search_fns = [_search_wiki, _search_ddg, _search_bing, _search_baidu]
     tasks = [asyncio.create_task(_safe_search(fn, content)) for fn in search_fns]
     all_results = []
     try:
