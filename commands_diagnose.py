@@ -86,40 +86,36 @@ def _check_code_bugs():
                         bugs.append(f"⚠️ {fname} 第{i}行: f-string 中 '{var}' 可能未定义，需要用 '{{{var}}}' 转义")
 
         # 4. 检查 except Exception 是否遗漏 FinishedException
-        # 只检查包含 .finish() 或 .send() 的函数（这些才会抛出 FinishedException）
-        # 先找出哪些函数调用了 finish/send
-        finish_functions = set()
-        for i, line in enumerate(lines, 1):
-            if ".finish(" in line or ".send(" in line:
-                # 找到这个函数的范围
-                func_start = -1
-                for j in range(i - 1, max(i - 50, -1), -1):
-                    if lines[j].strip().startswith("def ") or lines[j].strip().startswith("async def "):
-                        func_start = j + 1
-                        break
-                if func_start > 0:
-                    finish_functions.add(func_start)
-
+        # 只检查同一个 try 块内调用了 .finish() 或 .send() 的情况
         for i, line in enumerate(lines, 1):
             stripped = line.strip()
             if stripped.startswith("except Exception"):
-                # 找到这个 except 所在的函数起始行
-                func_start = -1
-                for j in range(i - 1, max(i - 50, -1), -1):
-                    if lines[j].strip().startswith("def ") or lines[j].strip().startswith("async def "):
-                        func_start = j + 1
+                # 向上找对应的 try: 块
+                try_line = -1
+                for j in range(i - 1, max(i - 20, -1), -1):
+                    if lines[j].strip().startswith("try:"):
+                        try_line = j
                         break
-                # 只检查调用了 finish/send 的函数
-                if func_start not in finish_functions:
+                    if lines[j].strip().startswith("except "):
+                        break  # 遇到另一个except，说明不是同一个try
+                if try_line < 0:
                     continue
+
+                # 检查 try 块内（try: 到这个 except 之间）是否有 .finish() 或 .send()
+                has_finish = False
+                for j in range(try_line + 1, i):
+                    if ".finish(" in lines[j] or ".send(" in lines[j]:
+                        has_finish = True
+                        break
+                if not has_finish:
+                    continue
+
                 # 检查前面是否有 except FinishedException
                 found_finished = False
-                for j in range(i - 2, max(i - 10, -1), -1):
+                for j in range(i - 1, try_line, -1):
                     if "FinishedException" in lines[j]:
                         found_finished = True
                         break
-                    if "try:" in lines[j] or "except" in lines[j]:
-                        continue
                 if not found_finished and "FinishedException" in source:
                     bugs.append(f"⚠️ {fname} 第{i}行: except Exception 可能吞掉 FinishedException")
 
