@@ -1002,6 +1002,8 @@ type规则：
                 chat_history[user_id] = [chat_history[user_id][0]] + chat_history[user_id][-20:]
             _history_timestamps[user_id] = time.time()
             await _img_chat.finish(reply)
+    except FinishedException:
+        raise
     except Exception as e:
         # 模型不支持视觉或请求失败
         logger.warning(f"[图片理解] 失败: {type(e).__name__}: {str(e)[:100]}")
