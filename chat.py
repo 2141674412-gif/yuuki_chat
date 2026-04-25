@@ -725,8 +725,14 @@ async def handle_image_chat(event: MessageEvent):
     if not has_image:
         return
 
-    # 提取纯文本（去掉@标记）
-    plain = re.sub(r'\[at:qq=\d+\]', '', str(event.message)).strip()
+    # 提取纯文本（只取text段，去掉@标记和图片段）
+    plain = ""
+    for seg in event.message:
+        if seg.type == "text":
+            plain += seg.data.get("text", "")
+    plain = re.sub(r'\[at:qq=\d+\]', '', plain).strip()
+    # 去掉CQ码残留
+    plain = re.sub(r'\[CQ:[^\]]+\]', '', plain).strip()
 
     # 截图记账模式：有图片+提到"记/记账" 或 纯图片（无文字）不需要@bot
     _has_accounting_keyword = any(kw in plain for kw in ["记", "记账", "记录"])
