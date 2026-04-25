@@ -42,6 +42,7 @@ COMMAND_NAMES = [
     "搜索", "搜一下", "查一查",
     "天气", "weather", "绑定天气", "bindweather", "解绑天气", "unbindweather",
     "我的天气", "myweather", "setcity",
+    "生日", "birthday", "设置生日", "setbirthday", "setbirth", "删除生日", "delbirthday", "delbirth",
     "词云",
     "提醒",
     "定时", "定时列表", "取消定时",

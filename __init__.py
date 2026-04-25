@@ -39,6 +39,7 @@ from . import commands_weather
 from . import commands_wordcloud
 from . import commands_admin
 from . import commands_group_admin
+from . import commands_birthday
 from . import commands_update
 from . import commands_schedule
 from . import commands_backup
