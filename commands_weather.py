@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import httpx
 from nonebot import logger, get_bot
-from nonebot.adapters.onebot.v11 import MessageEvent
+from nonebot.adapters.onebot.v11 import MessageEvent, ActionFailed
 
 from nonebot.exception import FinishedException
 
@@ -296,6 +296,20 @@ async def _send_weather_report(group_id: str):
             message=f"🌅 早安天气播报\n{weather_text}"
         )
         logger.info(f"[天气] 已向群 {group_id} 播报 {city} 天气")
+    except ActionFailed as e:
+        logger.error(f"[天气] 播报失败（群{group_id}可能不存在或bot无权限）: {e}")
+        # 自动清理无效的群绑定
+        if group_id in _weather_binds:
+            del _weather_binds[group_id]
+            _save_weather_binds(_weather_binds)
+            try:
+                sched = _get_scheduler()
+                key = f"weather_{group_id}"
+                if sched.get_job(key):
+                    sched.remove_job(key)
+            except Exception:
+                pass
+            logger.info(f"[天气] 已自动清理无效绑定: 群{group_id}")
     except Exception as e:
         logger.error(f"[天气] 播报失败: {e}")
 
@@ -303,6 +317,9 @@ async def _send_weather_report(group_id: str):
 def _restore_weather_jobs():
     """启动时恢复天气定时任务"""
     for gid, bind in _weather_binds.items():
+        # 只恢复群绑定（有hour字段的），跳过个人绑定
+        if "hour" not in bind:
+            continue
         try:
             sched = _get_scheduler()
             key = f"weather_{gid}"
