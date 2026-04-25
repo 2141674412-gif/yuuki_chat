@@ -3,6 +3,8 @@
 import os
 import sys
 import time
+import ast
+import traceback
 from datetime import datetime
 
 from nonebot import logger, get_driver
@@ -12,6 +14,107 @@ from .commands_base import _register, check_superuser, _DATA_DIR
 import asyncio
 
 # ─────────────────────────────────────────────────────────────
+
+def _check_code_bugs():
+    """静态代码检查：检测常见的bug模式"""
+    bugs = []
+
+    try:
+        from .config import _PLUGIN_DIR as _PD
+    except Exception:
+        _PD = os.path.dirname(os.path.abspath(__file__))
+
+    # 要检查的文件
+    check_files = [
+        "chat.py", "commands_base.py", "commands_update.py",
+        "commands_group_admin.py", "commands_weather.py",
+        "commands_fun.py", "commands_checkin.py", "commands_schedule.py",
+        "commands_birthday.py", "commands_wordcloud.py", "config.py",
+        "__init__.py",
+    ]
+
+    for fname in check_files:
+        fpath = os.path.join(_PD, fname)
+        if not os.path.exists(fpath):
+            bugs.append(f"❌ 文件缺失: {fname}")
+            continue
+
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                source = f.read()
+            lines = source.split("\n")
+        except Exception as e:
+            bugs.append(f"❌ 无法读取 {fname}: {e}")
+            continue
+
+        # 1. SyntaxError 检查
+        try:
+            ast.parse(source)
+        except SyntaxError as e:
+            bugs.append(f"❌ {fname} 第{e.lineno}行: SyntaxError: {e.msg}")
+            continue
+
+        # 2. global 声明位置检查（必须在函数开头）
+        for i, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if stripped.startswith("global "):
+                # 检查前面是否有非空非注释非global行
+                for j in range(i - 2, max(i - 20, -1), -1):
+                    prev = lines[j].strip()
+                    if not prev or prev.startswith("#") or prev.startswith("global "):
+                        continue
+                    if prev.startswith("def ") or prev.startswith("async def "):
+                        break
+                    # global 前有其他语句
+                    bugs.append(f"⚠️ {fname} 第{i}行: global 声明不在函数开头（前面有代码）")
+                    break
+
+        # 3. f-string 中未转义的变量引用检查
+        for i, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if 'f"' in stripped or "f'" in stripped:
+                # 简单检查：在 f-string 中是否有 {nickname} 这种可能未定义的
+                import re
+                fstring_vars = re.findall(r'\{([a-zA-Z_]\w*)\}', stripped)
+                for var in fstring_vars:
+                    # 常见误用：{nickname} 应该是 {{nickname}}
+                    if var in ("nickname",) and f"{{{var}}}" not in stripped:
+                        bugs.append(f"⚠️ {fname} 第{i}行: f-string 中 '{var}' 可能未定义，需要用 '{{{var}}}' 转义")
+
+        # 4. 检查 except 是否遗漏 FinishedException
+        for i, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if stripped.startswith("except Exception"):
+                # 检查前面是否有 except FinishedException
+                found_finished = False
+                for j in range(i - 2, max(i - 10, -1), -1):
+                    if "FinishedException" in lines[j]:
+                        found_finished = True
+                        break
+                    if "try:" in lines[j] or "except" in lines[j]:
+                        continue
+                # 检查文件是否导入了 FinishedException
+                if not found_finished and "FinishedException" in source:
+                    # 检查是否在同一个函数内
+                    bugs.append(f"⚠️ {fname} 第{i}行: except Exception 可能吞掉 FinishedException")
+
+        # 5. 检查 open() 没有 with 语句
+        for i, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if "open(" in stripped and "with " not in stripped and "with(" not in stripped:
+                # 排除一些安全的情况
+                if "json.load(" in stripped or "json.dump(" in stripped:
+                    continue
+                if "= open(" in stripped and ".read()" in lines[min(i, len(lines)-1)]:
+                    bugs.append(f"⚠️ {fname} 第{i}行: open() 未使用 with 语句，可能泄漏文件句柄")
+
+        # 6. 检查 _cmd_update_cmd.send / _cmd_update_cmd.finish（旧代码残留）
+        for i, line in enumerate(lines, 1):
+            if "_cmd_update_cmd.send(" in line or "_cmd_update_cmd.finish(" in line:
+                bugs.append(f"❌ {fname} 第{i}行: 使用了旧的 _cmd_update_cmd.send/finish，应改用 bot 直接发送")
+
+    return bugs
+
 
 async def _cmd_diagnose(event: MessageEvent):
     """自检诊断：检查bot运行环境和常见问题"""
@@ -57,6 +160,7 @@ async def _cmd_diagnose(event: MessageEvent):
     # ── 4. 网络检查 ──
     github_ok = False
     ai_ok = False
+    weather_ok = False
     try:
         from .utils import get_shared_http_client
         client = get_shared_http_client()
@@ -76,6 +180,12 @@ async def _cmd_diagnose(event: MessageEvent):
                 ai_ok = resp.status_code in (200, 401, 403)
         except Exception:
             pass
+
+        try:
+            resp = await client.get("https://wttr.in", headers={"User-Agent": "curl/7.68.0"}, timeout=5.0)
+            weather_ok = resp.status_code in (200, 301, 302)
+        except Exception:
+            pass
     except Exception:
         pass
 
@@ -83,18 +193,36 @@ async def _cmd_diagnose(event: MessageEvent):
         warnings.append("GitHub 不可访问，更新功能可能受影响")
     if not ai_ok:
         warnings.append("AI API 不可访问，聊天功能可能受影响")
+    if not weather_ok:
+        warnings.append("天气API不可访问，天气功能可能受影响")
 
     # ── 5. 文件完整性 ──
     try:
         from .config import _PLUGIN_DIR as _PD
-        required = ["__init__.py", "config.py", "chat.py", "utils.py", "commands_base.py"]
+        required = [
+            "__init__.py", "config.py", "chat.py", "utils.py", "commands_base.py",
+            "commands_fun.py", "commands_checkin.py", "commands_remind.py",
+            "commands_calc.py", "commands_translate.py", "commands_search.py",
+            "commands_weather.py", "commands_wordcloud.py", "commands_admin.py",
+            "commands_group_admin.py", "commands_update.py", "commands_schedule.py",
+            "commands_backup.py", "commands_vault.py", "commands_sticker.py",
+            "commands_remote.py", "commands_diagnose.py", "commands_birthday.py",
+        ]
         for f in required:
             if not os.path.exists(os.path.join(_PD, f)):
                 issues.append(f"文件缺失: {f}")
     except Exception:
         pass
 
-    # ── 6. 进程状态 ──
+    # ── 6. 代码bug检查 ──
+    code_bugs = _check_code_bugs()
+    for bug in code_bugs:
+        if bug.startswith("❌"):
+            issues.append(bug)
+        else:
+            warnings.append(bug)
+
+    # ── 7. 进程状态 ──
     mem_str = ""
     try:
         import psutil
@@ -103,7 +231,7 @@ async def _cmd_diagnose(event: MessageEvent):
     except ImportError:
         pass
 
-    # ── 7. 运行时间 ──
+    # ── 8. 运行时间 ──
     uptime_str = ""
     try:
         from . import _start_time
@@ -113,7 +241,7 @@ async def _cmd_diagnose(event: MessageEvent):
     except Exception:
         pass
 
-    # ── 8. 定时任务 ──
+    # ── 9. 定时任务 ──
     job_count = 0
     try:
         from nonebot_plugin_apscheduler import scheduler
@@ -121,23 +249,54 @@ async def _cmd_diagnose(event: MessageEvent):
     except Exception:
         pass
 
-    # ========== 输出 ==========
-    # 正常模式：简洁摘要
-    # 有问题模式：详细报告
+    # ── 10. 版本信息 ──
+    version_str = ""
+    try:
+        vfile = os.path.join(_DATA_DIR, ".version")
+        if os.path.exists(vfile):
+            with open(vfile) as f:
+                version_str = f.read().strip()
+    except Exception:
+        pass
 
+    # ── 11. 群白名单状态 ──
+    group_info = ""
+    try:
+        from .config import ALLOWED_GROUPS
+        group_info = f"{len(ALLOWED_GROUPS)}个群"
+    except Exception:
+        pass
+
+    # ── 12. 数据文件大小 ──
+    data_size = 0
+    try:
+        for f in os.listdir(_DATA_DIR):
+            fp = os.path.join(_DATA_DIR, f)
+            if os.path.isfile(fp):
+                data_size += os.path.getsize(fp)
+        if data_size > 1024 * 1024:
+            data_str = f"{data_size/1024/1024:.1f}MB"
+        else:
+            data_str = f"{data_size/1024:.0f}KB"
+    except Exception:
+        data_str = "?"
+
+    # ========== 输出 ==========
     if not issues and not warnings:
-        # 一切正常，只显示简要状态
         msg = "✅ 自检通过，一切正常\n"
-        msg += "─" * 20 + "\n"
-        msg += f"Python {sys.version.split()[0]} | "
+        msg += "─" * 24 + "\n"
+        msg += f"版本 {version_str or '?'} | Python {sys.version.split()[0]}\n"
         if mem_str:
             msg += f"内存 {mem_str} | "
         if uptime_str:
             msg += f"运行 {uptime_str} | "
         msg += f"定时任务 {job_count}个\n"
         msg += f"依赖 {len(deps)-len(missing_deps)}/{len(deps)} | "
+        msg += f"数据 {data_str}\n"
         msg += f"GitHub {'✅' if github_ok else '❌'} | "
-        msg += f"AI {'✅' if ai_ok else '❌'}"
+        msg += f"AI {'✅' if ai_ok else '❌'} | "
+        msg += f"天气 {'✅' if weather_ok else '❌'} | "
+        msg += f"群 {group_info}"
         await diagnose_cmd.finish(msg)
         return
 
@@ -145,10 +304,19 @@ async def _cmd_diagnose(event: MessageEvent):
     report = []
     report.append("🔍 自检诊断报告")
     report.append("=" * 30)
-    report.append(f"Python {sys.version.split()[0]} | "
+    report.append(f"版本 {version_str or '?'} | Python {sys.version.split()[0]} | "
                    f"{'内存 '+mem_str if mem_str else ''}{' | ' if mem_str else ''}"
                    f"{'运行 '+uptime_str if uptime_str else ''}")
     report.append("")
+
+    # 代码bug
+    code_issues = [b for b in code_bugs if b.startswith("❌")]
+    code_warnings = [b for b in code_bugs if b.startswith("⚠️")]
+    if code_issues or code_warnings:
+        report.append("【代码检查】")
+        for b in code_issues + code_warnings:
+            report.append(f"  {b}")
+        report.append("")
 
     # 依赖
     if missing_deps:
@@ -159,10 +327,11 @@ async def _cmd_diagnose(event: MessageEvent):
         report.append("")
 
     # 网络
-    if not github_ok or not ai_ok:
+    if not github_ok or not ai_ok or not weather_ok:
         report.append("【网络】")
         report.append(f"  {'✅' if github_ok else '❌'} GitHub API")
         report.append(f"  {'✅' if ai_ok else '❌'} AI API")
+        report.append(f"  {'✅' if weather_ok else '❌'} 天气 API")
         report.append("")
 
     # 文件
@@ -170,7 +339,7 @@ async def _cmd_diagnose(event: MessageEvent):
     if missing_files:
         report.append("【文件】")
         for f in missing_files:
-            report.append(f"  ❌ {f.replace('文件缺失: ', '')}")
+            report.append(f"  {f}")
         report.append("")
 
     # 定时任务
