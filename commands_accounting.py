@@ -178,12 +178,15 @@ async def _cmd_bill(event: MessageEvent):
 
     # 按分类汇总
     expense_by_cat = {}
+    income_by_cat = {}
     income_total = 0
     expense_total = 0
 
     for r in filtered:
         if r["type"] == "income":
             income_total += r["amount"]
+            cat = r.get("category", "收入")
+            income_by_cat[cat] = income_by_cat.get(cat, 0) + r["amount"]
         else:
             expense_total += r["amount"]
             cat = r["category"]
@@ -199,23 +202,29 @@ async def _cmd_bill(event: MessageEvent):
     else:
         lines.append(f"📊 账单（{len(filtered)}笔）")
 
-    lines.append("─" * 20)
+    lines.append("")
 
-    # 支出分类
+    # 支出分类（按金额降序）
     if expense_by_cat:
         sorted_cats = sorted(expense_by_cat.items(), key=lambda x: x[1], reverse=True)
         for cat, amount in sorted_cats:
-            lines.append(f"📤 {cat}: -{amount:.0f}")
+            lines.append(f"  📤 {cat}　-{amount:.2f}")
 
+    # 收入分类
+    if income_by_cat:
+        sorted_income = sorted(income_by_cat.items(), key=lambda x: x[1], reverse=True)
+        for cat, amount in sorted_income:
+            lines.append(f"  📥 {cat}　+{amount:.2f}")
+
+    lines.append("─" * 16)
+    lines.append(f"  💰 支出　-{expense_total:.2f}")
     if income_total > 0:
-        lines.append(f"📥 收入: +{income_total:.0f}")
-
-    lines.append("─" * 20)
+        lines.append(f"  💰 收入　+{income_total:.2f}")
     net = income_total - expense_total
     if net >= 0:
-        lines.append(f"结余: +{net:.0f}")
+        lines.append(f"  📈 结余　+{net:.2f}")
     else:
-        lines.append(f"结余: {net:.0f}")
+        lines.append(f"  📉 结余　{net:.2f}")
 
     await bill_cmd.finish("\n".join(lines))
 
