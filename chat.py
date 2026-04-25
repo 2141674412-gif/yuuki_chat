@@ -740,37 +740,54 @@ async def handle_image_chat(event: MessageEvent):
     img_urls = []
     for seg in event.message:
         if seg.type == "image":
-            img_urls.append(seg.data.get("url", ""))
+            url = seg.data.get("url", "")
+            file = seg.data.get("file", "")
+            # 优先用url，没有则尝试file
+            if not url and file:
+                url = file
+            if url:
+                img_urls.append(url)
             if len(img_urls) >= _MAX_IMAGES:
                 break
 
     if not img_urls:
+        logger.warning("[图片理解] 未获取到图片URL")
         return
 
     try:
         # 下载并处理所有图片
         images_b64 = []
         for img_url in img_urls:
-            resp = await _get_http_client().get(img_url, timeout=10.0)
-            if resp.status_code != 200:
+            try:
+                resp = await _get_http_client().get(img_url, timeout=10.0)
+                if resp.status_code != 200:
+                    logger.warning(f"[图片理解] 下载失败: {resp.status_code} {img_url[:80]}")
+                    continue
+                img_data = resp.content
+
+                # 检查是否是GIF
+                is_gif = img_url.lower().endswith('.gif') or img_data[:4] == b'GIF8'
+
+                if is_gif:
+                    # 提取GIF关键帧
+                    frames = _extract_gif_frames(img_data)
+                    for frame_data in frames:
+                        frame_data = _compress_image(frame_data)
+                        images_b64.append(base64.b64encode(frame_data).decode("utf-8"))
+                else:
+                    # 压缩普通图片
+                    img_data = _compress_image(img_data)
+                    images_b64.append(base64.b64encode(img_data).decode("utf-8"))
+            except Exception as e:
+                logger.warning(f"[图片理解] 处理图片失败: {e}")
                 continue
-            img_data = resp.content
-
-            # 检查是否是GIF
-            is_gif = img_url.lower().endswith('.gif') or img_data[:4] == b'GIF8'
-
-            if is_gif:
-                # 提取GIF关键帧
-                frames = _extract_gif_frames(img_data)
-                for frame_data in frames:
-                    frame_data = _compress_image(frame_data)
-                    images_b64.append(base64.b64encode(frame_data).decode("utf-8"))
-            else:
-                # 压缩普通图片
-                img_data = _compress_image(img_data)
-                images_b64.append(base64.b64encode(img_data).decode("utf-8"))
 
         if not images_b64:
+            logger.warning(f"[图片理解] 图片处理失败，原始URL数: {len(img_urls)}")
+            try:
+                await _img_chat.send("...图片处理失败了。")
+            except Exception:
+                pass
             return
 
         # 使用视觉模型
