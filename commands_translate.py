@@ -2,12 +2,16 @@
 
 import asyncio
 import re
+import time
 
 import httpx
 from nonebot import logger
 from nonebot.adapters.onebot.v11 import MessageEvent
 
 from .commands_base import _register, _get_http_client
+
+_translate_cache = {}  # {f"{text}|{lang}": {"result": str, "time": float}}
+_TRANSLATE_TTL = 300  # 5分钟
 
 
 async def _translate_api1(text, target_lang):
@@ -67,10 +71,25 @@ async def _cmd_translate(event: MessageEvent):
         else:
             target_lang = "zh"
 
+    # 检查缓存
+    _cache_key = f"{text_to_translate}|{target_lang}"
+    if _cache_key in _translate_cache:
+        _cached = _translate_cache[_cache_key]
+        if time.time() - _cached["time"] < _TRANSLATE_TTL:
+            await translate_cmd.finish(f"{text_to_translate}\n→ {_cached['result']}（缓存）")
+
     apis = [_translate_api1, _translate_api2, _translate_api3]
 
     # 并行请求所有翻译 API，取第一个成功的结果
     _timeout_hit = False
+
+    def _save_to_cache(result_text):
+        """将翻译结果存入缓存（上限50条，LRU淘汰）"""
+        if len(_translate_cache) >= 50:
+            # 淘汰最旧的条目
+            oldest_key = min(_translate_cache, key=lambda k: _translate_cache[k]["time"])
+            del _translate_cache[oldest_key]
+        _translate_cache[_cache_key] = {"result": result_text, "time": time.time()}
 
     async def _safe_call(api_fn):
         nonlocal _timeout_hit
@@ -94,6 +113,7 @@ async def _cmd_translate(event: MessageEvent):
                 # 取到结果，取消其他未完成任务
                 for p in pending:
                     p.cancel()
+                _save_to_cache(result)
                 await translate_cmd.finish(f"{text_to_translate}\n→ {result}")
         # 第一个完成的没有结果，等待剩余任务
         if pending:
@@ -101,6 +121,7 @@ async def _cmd_translate(event: MessageEvent):
             for t in done2:
                 result = t.result()
                 if result:
+                    _save_to_cache(result)
                     await translate_cmd.finish(f"{text_to_translate}\n→ {result}")
     except Exception as e:
         logger.debug(f"[翻译] {e}")

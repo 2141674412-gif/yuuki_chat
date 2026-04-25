@@ -54,7 +54,7 @@ async def _cmd_calc(event: MessageEvent):
     if not expr:
         await calc_cmd.finish("...算什么。你倒是给我算式啊。")
 
-    if not re.match(r'^[\d+\-*/().\s^]+$', expr):
+    if not re.match(r'^[\d+\-*/().\s^eE]+$', expr):
         await calc_cmd.finish("这个我算不了。太复杂了。")
         return
 

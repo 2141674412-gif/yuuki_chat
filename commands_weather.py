@@ -21,6 +21,7 @@ _WEATHER_TTL = 600  # 10分钟缓存
 # 天气绑定文件
 _WEATHER_BINDS_FILE = os.path.join(_DATA_DIR, "weather_binds.json")
 # 群绑定: {group_id: {"city": "北京", "hour": 8, "minute": 0}}
+_WEATHER_USER_FILE = os.path.join(_DATA_DIR, "weather_user_binds.json")
 # 个人绑定: {user_id: {"city": "上海"}}
 
 def _load_weather_binds() -> dict:
@@ -29,12 +30,19 @@ def _load_weather_binds() -> dict:
 def _save_weather_binds(binds: dict):
     _save_json(_WEATHER_BINDS_FILE, binds)
 
+def _load_weather_user_binds() -> dict:
+    return _load_json(_WEATHER_USER_FILE) or {}
+
+def _save_weather_user_binds(binds: dict):
+    _save_json(_WEATHER_USER_FILE, binds)
+
 _weather_binds = _load_weather_binds()
+_weather_user_binds = _load_weather_user_binds()
 
 
 def _get_user_weather_city(user_id: str) -> str:
     """获取个人绑定的天气城市"""
-    bind = _weather_binds.get(user_id)
+    bind = _weather_user_binds.get(user_id)
     if bind and isinstance(bind, dict) and "city" in bind:
         return bind["city"]
     return ""
@@ -297,19 +305,22 @@ async def _send_weather_report(group_id: str):
         )
         logger.info(f"[天气] 已向群 {group_id} 播报 {city} 天气")
     except ActionFailed as e:
-        logger.error(f"[天气] 播报失败（群{group_id}可能不存在或bot无权限）: {e}")
-        # 自动清理无效的群绑定
-        if group_id in _weather_binds:
-            del _weather_binds[group_id]
-            _save_weather_binds(_weather_binds)
-            try:
-                sched = _get_scheduler()
-                key = f"weather_{group_id}"
-                if sched.get_job(key):
-                    sched.remove_job(key)
-            except Exception:
-                pass
-            logger.info(f"[天气] 已自动清理无效绑定: 群{group_id}")
+        if e.retcode == 1200:
+            # 被踢出群，自动清理无效的群绑定
+            logger.error(f"[天气] 播报失败（群{group_id}已被踢出）: {e}")
+            if group_id in _weather_binds:
+                del _weather_binds[group_id]
+                _save_weather_binds(_weather_binds)
+                try:
+                    sched = _get_scheduler()
+                    key = f"weather_{group_id}"
+                    if sched.get_job(key):
+                        sched.remove_job(key)
+                except Exception:
+                    pass
+                logger.info(f"[天气] 已自动清理无效绑定: 群{group_id}")
+        else:
+            logger.error(f"[天气] 播报失败（群{group_id}）: {e}")
     except Exception as e:
         logger.error(f"[天气] 播报失败: {e}")
 
@@ -317,9 +328,6 @@ async def _send_weather_report(group_id: str):
 def _restore_weather_jobs():
     """启动时恢复天气定时任务"""
     for gid, bind in _weather_binds.items():
-        # 只恢复群绑定（有hour字段的），跳过个人绑定
-        if "hour" not in bind:
-            continue
         try:
             sched = _get_scheduler()
             key = f"weather_{gid}"
@@ -358,17 +366,17 @@ async def _cmd_my_weather(event: MessageEvent):
         return
 
     if content in ("取消", "删除", "清除"):
-        if user_id in _weather_binds:
-            del _weather_binds[user_id]
-            _save_weather_binds(_weather_binds)
+        if user_id in _weather_user_binds:
+            del _weather_user_binds[user_id]
+            _save_weather_user_binds(_weather_user_binds)
             await my_weather_cmd.finish("...已取消天气绑定。")
         else:
             await my_weather_cmd.finish("...你还没绑定天气城市。")
         return
 
     # 绑定
-    _weather_binds[user_id] = {"city": content}
-    _save_weather_binds(_weather_binds)
+    _weather_user_binds[user_id] = {"city": content}
+    _save_weather_user_binds(_weather_user_binds)
     await my_weather_cmd.finish(f"...已绑定天气城市：{content}\n以后直接发 /天气 就能查了。\n提示：同名城市可加省份，如 /我的天气 广东深圳")
 
 

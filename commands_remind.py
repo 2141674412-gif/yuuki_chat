@@ -54,7 +54,12 @@ async def _cmd_reminders(event: MessageEvent):
     if user_id not in reminders or not reminders[user_id]:
         await reminders_cmd.finish("你没什么提醒。")
 
-    lines = [f"{r['id']}. {r['content']} ({r['time'].strftime('%H:%M')})" for r in reminders[user_id]]
+    now = datetime.now()
+    active = [r for r in reminders[user_id] if r["time"] > now]
+    if not active:
+        await reminders_cmd.finish("你没什么提醒。")
+
+    lines = [f"{r['id']}. {r['content']} ({r['time'].strftime('%H:%M')})" for r in active]
     await reminders_cmd.finish("你的提醒：\n" + "\n".join(lines))
 
 reminders_cmd = _register("历史", _cmd_reminders)
@@ -88,3 +93,59 @@ async def _cmd_cancel_remind(event: MessageEvent):
     await cancel_remind_cmd.finish("找不到这个提醒。")
 
 cancel_remind_cmd = _register("取消提醒", _cmd_cancel_remind)
+
+
+# -- 定时检查提醒 --
+
+from .commands_schedule import _get_scheduler
+from nonebot import get_bot, logger
+
+
+async def _check_reminders():
+    """遍历所有用户的提醒，找到已到期的，发送私聊消息提醒，然后删除。"""
+    now = datetime.now()
+    changed = False
+    try:
+        bot = get_bot()
+    except Exception:
+        logger.warning("[提醒] 获取bot实例失败，跳过本次检查。")
+        return
+
+    for user_id in list(reminders.keys()):
+        user_reminders = reminders[user_id]
+        expired = [r for r in user_reminders if r["time"] <= now]
+        if not expired:
+            continue
+        for r in expired:
+            try:
+                await bot.send_private_msg(
+                    user_id=int(user_id),
+                    message=f"到点了。{r['content']}。",
+                )
+                logger.info(f"[提醒] 已向用户 {user_id} 发送提醒：{r['content']}")
+            except Exception as e:
+                logger.warning(f"[提醒] 向用户 {user_id} 发送提醒失败：{e}")
+        reminders[user_id] = [r for r in user_reminders if r["time"] > now]
+        changed = True
+
+    if changed:
+        _save_reminders()
+
+
+def _register_reminder_jobs():
+    """用APScheduler注册每分钟执行一次 _check_reminders。"""
+    try:
+        scheduler = _get_scheduler()
+        scheduler.add_job(
+            _check_reminders,
+            "interval",
+            minutes=1,
+            id="check_reminders",
+            replace_existing=True,
+        )
+        logger.info("[提醒] 定时检查任务已注册，每分钟执行一次。")
+    except Exception as e:
+        logger.warning(f"[提醒] 注册定时任务失败：{e}")
+
+
+_register_reminder_jobs()

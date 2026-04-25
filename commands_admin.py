@@ -33,7 +33,12 @@ async def _cmd_set_persona(event: MessageEvent):
 
     try:
         save_persona(new_persona)
-        chat_history.clear()
+        new_system = {"role": "system", "content": new_persona}
+        for uid in chat_history:
+            if chat_history[uid] and chat_history[uid][0].get("role") == "system":
+                chat_history[uid][0] = new_system
+            else:
+                chat_history[uid].insert(0, new_system)
         await set_persona_cmd.finish("...知道了。人设已更新。")
     except OSError as e:
         await set_persona_cmd.finish(f"保存人设失败：{str(e)}")

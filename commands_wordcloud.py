@@ -96,9 +96,91 @@ async def _cmd_wordcloud(event: MessageEvent):
     # 统计词频
     counter = Counter(words)
     top10 = counter.most_common(10)
-    lines = [f"【词云 Top10（近{days}天）】"]
-    for i, (word, count) in enumerate(top10, 1):
-        lines.append(f"{i}. {word} ({count}次)")
-    await wordcloud_cmd.finish("\n".join(lines))
+    top20 = counter.most_common(20)
+
+    # 尝试用PIL生成词云图片
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        from .utils import get_font
+
+        img_width, img_height = 800, 400
+        img = Image.new("RGB", (img_width, img_height), "#1a1a2e")
+        draw = ImageDraw.Draw(img)
+
+        # 预定义一些好看的颜色
+        _colors = [
+            "#e94560", "#0f3460", "#16213e", "#e94560",
+            "#533483", "#0f3460", "#e94560", "#16213e",
+            "#533483", "#e94560", "#0f3460", "#533483",
+            "#e94560", "#16213e", "#0f3460", "#533483",
+            "#e94560", "#0f3460", "#16213e", "#533483",
+        ]
+
+        # 按词频从大到小排列，字号从大到小
+        if top20:
+            max_count = top20[0][1]
+            min_count = top20[-1][1]
+            count_range = max_count - min_count if max_count != min_count else 1
+
+        import random
+        random.seed(42)
+
+        # 简单的贪心放置，避免重叠
+        _placed = []  # [(x, y, w, h), ...]
+
+        def _try_place(text_w, text_h):
+            """尝试找一个不重叠的位置"""
+            for _ in range(200):
+                x = random.randint(10, max(10, img_width - text_w - 10))
+                y = random.randint(10, max(10, img_height - text_h - 10))
+                box = (x - 4, y - 4, x + text_w + 4, y + text_h + 4)
+                overlap = False
+                for px, py, pw, ph in _placed:
+                    if not (box[2] < px or box[0] > px + pw or box[3] < py or box[1] > py + ph):
+                        overlap = True
+                        break
+                if not overlap:
+                    return x, y
+            return None
+
+        for i, (word, count) in enumerate(top20):
+            # 字号：最大60，最小16
+            ratio = (count - min_count) / count_range if count_range else 1
+            font_size = int(16 + ratio * 44)
+            try:
+                font = get_font(font_size, bold=(ratio > 0.5))
+            except Exception:
+                font = ImageFont.load_default()
+
+            bbox = draw.textbbox((0, 0), word, font=font)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+
+            pos = _try_place(text_w, text_h)
+            if pos:
+                x, y = pos
+                color = _colors[i % len(_colors)]
+                draw.text((x, y), word, fill=color, font=font)
+                _placed.append((x, y, text_w, text_h))
+
+        # 保存到临时文件
+        import tempfile
+        import os
+        tmp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp_wordcloud")
+        os.makedirs(tmp_dir, exist_ok=True)
+        tmp_path = os.path.join(tmp_dir, f"wordcloud_{int(time.time())}.png")
+        img.save(tmp_path, "PNG")
+
+        from nonebot.adapters.onebot.v11 import MessageSegment
+        lines = [f"【词云 Top10（近{days}天）】"]
+        for i, (word, count) in enumerate(top10, 1):
+            lines.append(f"{i}. {word} ({count}次)")
+        await wordcloud_cmd.finish("\n".join(lines) + "\n[词云图片]" + MessageSegment.image(f"file://{tmp_path}"))
+    except Exception as e:
+        logger.debug(f"[词云] 生成图片失败，回退到文字列表：{e}")
+        lines = [f"【词云 Top10（近{days}天）】"]
+        for i, (word, count) in enumerate(top10, 1):
+            lines.append(f"{i}. {word} ({count}次)")
+        await wordcloud_cmd.finish("\n".join(lines))
 
 wordcloud_cmd = _register("词云", _cmd_wordcloud)
