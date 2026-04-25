@@ -105,16 +105,14 @@ async def _search_ddg(query):
         heading = data.get("Heading", "").strip()
         url = data.get("AbstractURL", "").strip()
 
-        # 过滤英文维基（中文搜索不需要）
-        if url and "en.wikipedia.org" in url:
-            return None
-
         if heading and abstract and len(abstract) > 20:
+            is_english = bool(url and "en.wikipedia.org" in url)
             return {
                 "source": "ddg",
                 "title": heading,
                 "desc": abstract,
                 "url": url,
+                "is_english": is_english,  # 标记为英文结果
             }
     except Exception as e:
         logger.warning(f"[搜索DDG] 失败: {e}")
@@ -212,10 +210,10 @@ async def _search_images(query, count=3):
 
 
 def _format_results(raw_results: list) -> str:
-    """格式化搜索结果，去重+排序"""
-    # 分类：百科类（单条高质量）和列表类（多条）
-    wiki_results = []
-    list_results = []
+    """格式化搜索结果，去重+排序，中文优先"""
+    wiki_results = []  # 中文百科
+    en_results = []    # 英文百科（兜底）
+    list_results = []  # 搜索列表
     seen_titles = set()
 
     for r in raw_results:
@@ -225,10 +223,11 @@ def _format_results(raw_results: list) -> str:
                 continue
             seen_titles.add(title)
 
-            if r.get("source") == "wiki":
-                wiki_results.append(r)
-            elif r.get("source") == "ddg":
-                wiki_results.append(r)
+            if r.get("source") in ("wiki", "ddg"):
+                if r.get("is_english"):
+                    en_results.append(r)
+                else:
+                    wiki_results.append(r)
             else:
                 list_results.append(r)
         elif isinstance(r, list):
@@ -239,10 +238,9 @@ def _format_results(raw_results: list) -> str:
                 seen_titles.add(title)
                 list_results.append(item)
 
-    # 格式化输出
     lines = []
 
-    # 百科结果（最多1条）
+    # 中文百科（优先）
     if wiki_results:
         w = wiki_results[0]
         lines.append(f"📖 【{w['title']}】")
@@ -251,19 +249,26 @@ def _format_results(raw_results: list) -> str:
             lines.append(f"🔗 {w['url']}")
         lines.append("")
 
-    # 列表结果（最多3条）
+    # 搜索列表（最多3条）
     count = 0
     for r in list_results:
         if count >= 3:
             break
         title = r.get("title", "")
         desc = r.get("desc", "")
-        # 过滤和百科重复的
         if wiki_results and title == wiki_results[0].get("title", ""):
             continue
         lines.append(f"【{title}】")
         lines.append(desc)
         count += 1
+
+    # 如果没有中文结果，用英文兜底
+    if not wiki_results and not list_results and en_results:
+        w = en_results[0]
+        lines.append(f"📖 【{w['title']}】（English）")
+        lines.append(w['desc'])
+        if w.get('url'):
+            lines.append(f"🔗 {w['url']}")
 
     return "\n".join(lines).strip()
 
