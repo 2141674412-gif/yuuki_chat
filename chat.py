@@ -728,8 +728,12 @@ async def handle_image_chat(event: MessageEvent):
     # 提取纯文本（去掉@标记）
     plain = re.sub(r'\[at:qq=\d+\]', '', str(event.message)).strip()
 
-    # 截图记账模式：纯图片（无文字或文字很短）不需要@bot
-    _accounting_mode = len(plain) <= 5 and not any(kw in plain for kw in ["希亚", "noa", "Noa", "结城", "正义的伙伴"])
+    # 截图记账模式：有图片+提到"记/记账" 或 纯图片（无文字）不需要@bot
+    _has_accounting_keyword = any(kw in plain for kw in ["记", "记账", "记录"])
+    _has_bot_mention = any(kw in plain for kw in ["希亚", "noa", "Noa", "结城", "正义的伙伴"])
+    # 去掉可能的QQ昵称后检查文字长度
+    _short_text = len(plain) <= 10
+    _accounting_mode = (_has_accounting_keyword or _short_text) and not _has_bot_mention
 
     # 群聊需要@bot或提到bot名字才触发，私聊直接触发
     # 但截图记账模式不需要@bot
@@ -805,8 +809,8 @@ async def handle_image_chat(event: MessageEvent):
         vision_model = _cfg("vision_model", "glm-4v-flash")
         client = _get_client()
 
-        # 第一步：快速判断是否是支付/收款截图（仅当没有文字或文字很短时）
-        _should_try_accounting = len(plain) <= 10 and not any(kw in plain for kw in ["看", "这是", "什么", "多少", "谁", "哪", "为什么", "怎么", "如何"])
+        # 截图记账模式或有记账关键词时，尝试自动识别
+        _should_try_accounting = _accounting_mode and not any(kw in plain for kw in ["看", "这是", "什么", "多少", "谁", "哪", "为什么", "怎么", "如何"])
 
         if _should_try_accounting:
             _classify_prompt = """只看这张图片，判断是否是支付/收款/账单/银行短信通知截图。
