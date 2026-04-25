@@ -720,14 +720,6 @@ async def handle_image_chat(event: MessageEvent):
     if gid and gid not in ALLOWED_GROUPS:
         return
 
-    # 群聊需要@bot或提到bot名字才触发，私聊直接触发
-    if gid:
-        msg_str = str(event.message)
-        is_at_me = getattr(event, 'to_me', False)
-        is_mentioned = any(name in msg_str for name in ["希亚", "noa", "Noa", "结城", "正义的伙伴"])
-        if not is_at_me and not is_mentioned:
-            return
-
     # 检查消息是否包含图片
     has_image = any(seg.type == "image" for seg in event.message)
     if not has_image:
@@ -736,27 +728,46 @@ async def handle_image_chat(event: MessageEvent):
     # 提取纯文本（去掉@标记）
     plain = re.sub(r'\[at:qq=\d+\]', '', str(event.message)).strip()
 
-    # 收集所有图片URL（最多5张）
+    # 截图记账模式：纯图片（无文字或文字很短）不需要@bot
+    _accounting_mode = len(plain) <= 5 and not any(kw in plain for kw in ["希亚", "noa", "Noa", "结城", "正义的伙伴"])
+
+    # 群聊需要@bot或提到bot名字才触发，私聊直接触发
+    # 但截图记账模式不需要@bot
+    if gid and not _accounting_mode:
+        msg_str = str(event.message)
+        is_at_me = getattr(event, 'to_me', False)
+        is_mentioned = any(name in msg_str for name in ["希亚", "noa", "Noa", "结城", "正义的伙伴"])
+        if not is_at_me and not is_mentioned:
+            return
+
+    # 收集所有图片（最多5张）
     img_urls = []
+    img_b64_list = []  # 直接的base64数据
     for seg in event.message:
         if seg.type == "image":
             url = seg.data.get("url", "")
             file = seg.data.get("file", "")
+            # 处理base64格式
+            if file and file.startswith("base64://"):
+                b64data = file[len("base64://"):]
+                if b64data:
+                    img_b64_list.append(b64data)
+                continue
             # 优先用url，没有则尝试file
             if not url and file:
                 url = file
             if url:
                 img_urls.append(url)
-            if len(img_urls) >= _MAX_IMAGES:
+            if len(img_urls) + len(img_b64_list) >= _MAX_IMAGES:
                 break
 
-    if not img_urls:
-        logger.warning("[图片理解] 未获取到图片URL")
+    if not img_urls and not img_b64_list:
+        logger.warning(f"[图片理解] 未获取到图片URL, seg.data={seg.data if seg.type == 'image' else 'N/A'}")
         return
 
     try:
         # 下载并处理所有图片
-        images_b64 = []
+        images_b64 = list(img_b64_list)  # 先加入已有的base64
         for img_url in img_urls:
             try:
                 resp = await _get_http_client().get(img_url, timeout=10.0)
@@ -917,6 +928,10 @@ type规则：
                             # 识别失败，走正常识图
             except Exception as e:
                 logger.warning(f"[截图记账] 分类/识别失败: {e}")
+
+            # 截图记账模式下，识别失败不回复（不打扰用户）
+            if _accounting_mode:
+                return
 
         # 正常识图模式
         # 构建消息内容
