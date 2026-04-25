@@ -6,6 +6,7 @@ import time
 
 import httpx
 from nonebot import logger
+from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import MessageEvent
 
 from .commands_base import _register, _get_http_client
@@ -123,6 +124,8 @@ async def _cmd_translate(event: MessageEvent):
                 if result:
                     _save_to_cache(result)
                     await translate_cmd.finish(f"{text_to_translate}\n→ {result}")
+    except FinishedException:
+        raise
     except Exception as e:
         logger.debug(f"[翻译] {e}")
 

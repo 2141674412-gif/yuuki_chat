@@ -1529,6 +1529,8 @@ async def handle_mai_plate(event: MessageEvent):
             await mai_plate_cmd.finish("...获取成绩失败。Token可能过期了，请重新绑定。")
         else:
             await mai_plate_cmd.finish(f"...请求出错（HTTP {status}）。")
+    except FinishedException:
+        raise
     except Exception as e:
         logger.error(f"[牌子查询] 出错: {e}")
         await mai_plate_cmd.finish("...查询出错了，稍后再试。")

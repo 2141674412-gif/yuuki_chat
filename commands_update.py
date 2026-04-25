@@ -483,6 +483,8 @@ async def _cmd_start_file_server(event: MessageEvent):
                 f"...文件服务器已在运行：http://127.0.0.1:{port}\n"
                 f"把 yuuki_chat.zip 放到 {server_dir} 目录下即可。")
             return
+    except FinishedException:
+        raise
     except Exception:
         pass
 

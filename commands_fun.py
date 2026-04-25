@@ -12,6 +12,7 @@ from datetime import datetime
 
 # 第三方库
 from nonebot import on_command, logger
+from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import MessageEvent
 
 # 基础模块
@@ -709,6 +710,8 @@ async def _cmd_music(event: MessageEvent):
 
         await music_cmd.finish("\n".join(lines))
 
+    except FinishedException:
+        raise
     except Exception as e:
         logger.debug(f"[点歌] 搜索失败: {type(e).__name__}")
         await music_cmd.finish("...搜索出错了，稍后再试。")

@@ -5,6 +5,7 @@ import re
 
 # 第三方库
 from nonebot import on_command, on_notice, on_message, logger
+from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent
 
 # 从子模块导入
@@ -48,8 +49,12 @@ async def _cmd_ban(event: MessageEvent, bot: Bot):
         await bot.set_group_ban(group_id=event.group_id, user_id=int(target_uid), duration=duration)
         try:
             await ban_cmd.finish(f"已禁言 {duration // 60} 分钟~")
+        except FinishedException:
+            raise
         except Exception:
             pass
+    except FinishedException:
+        raise
     except Exception as e:
         logger.error(f"[禁言] 失败: {e}")
         await ban_cmd.finish("...禁言失败了。")
@@ -74,8 +79,12 @@ async def _cmd_kick(event: MessageEvent, bot: Bot):
         logger.info(f"[踢] 成功: {target_uid}, ret={ret}")
         try:
             await kick_cmd.finish("已送走~")
+        except FinishedException:
+            raise
         except Exception:
             pass  # 发送失败不影响踢人结果
+    except FinishedException:
+        raise
     except Exception as e:
         logger.error(f"[踢] 失败: {e}")
         await kick_cmd.finish("...踢人失败了。")
@@ -93,10 +102,14 @@ async def _cmd_recall(event: MessageEvent, bot: Bot):
                 await bot.delete_msg(message_id=msg["message_id"])
                 try:
                     await recall_cmd.finish("已撤回~")
+                except FinishedException:
+                    raise
                 except Exception:
                     pass
                 return
         await recall_cmd.finish("...没有找到可以撤回的消息。")
+    except FinishedException:
+        raise
     except Exception as e:
         logger.error(f"[撤回] 失败: {e}")
         await recall_cmd.finish("...撤回失败了。")

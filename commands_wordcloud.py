@@ -7,6 +7,7 @@ from collections import Counter
 
 # 第三方库
 from nonebot import logger
+from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import MessageEvent
 
 # 从子模块导入
@@ -176,6 +177,8 @@ async def _cmd_wordcloud(event: MessageEvent):
         for i, (word, count) in enumerate(top10, 1):
             lines.append(f"{i}. {word} ({count}次)")
         await wordcloud_cmd.finish("\n".join(lines) + "\n[词云图片]" + MessageSegment.image(f"file://{tmp_path}"))
+    except FinishedException:
+        raise
     except Exception as e:
         logger.debug(f"[词云] 生成图片失败，回退到文字列表：{e}")
         lines = [f"【词云 Top10（近{days}天）】"]

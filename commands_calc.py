@@ -5,6 +5,7 @@ import operator
 import re
 
 from nonebot.adapters.onebot.v11 import MessageEvent
+from nonebot.exception import FinishedException
 
 from .commands_base import _register
 
@@ -67,6 +68,8 @@ async def _cmd_calc(event: MessageEvent):
         await calc_cmd.finish("...除以零了。你故意的吧。")
     except (ValueError, SyntaxError):
         await calc_cmd.finish("这个我算不了。太复杂了。")
+    except FinishedException:
+        raise
     except Exception:
         await calc_cmd.finish("...算错了。不怪我。")
 

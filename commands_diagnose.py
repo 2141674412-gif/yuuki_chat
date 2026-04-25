@@ -8,6 +8,7 @@ import traceback
 from datetime import datetime
 
 from nonebot import logger, get_driver
+from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import MessageEvent
 
 from .commands_base import _register, check_superuser, _DATA_DIR
@@ -453,6 +454,8 @@ async def _cmd_status(event: MessageEvent):
         status.append(f"群: {len(ALLOWED_GROUPS)}")
 
         await status_cmd.finish("\n".join(status))
+    except FinishedException:
+        raise
     except Exception as e:
         await status_cmd.finish(f"状态检查失败: {e}")
 
