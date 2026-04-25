@@ -926,6 +926,8 @@ type规则：
                                 except (json.JSONDecodeError, ValueError):
                                     pass
                             # 识别失败，走正常识图
+            except FinishedException:
+                raise
             except Exception as e:
                 logger.warning(f"[截图记账] 分类/识别失败: {e}")
 
