@@ -16,7 +16,35 @@ _TRANSLATE_TTL = 300  # 5分钟
 
 
 async def _translate_api1(text, target_lang):
-    """MyMemory 翻译API"""
+    """Google翻译（非官方API）"""
+    client = _get_http_client()
+    # langpair: auto|zh, auto|en, auto|ja 等
+    resp = await client.get(
+        "https://translate.googleapis.com/translate_a/single",
+        params={
+            "client": "gtx",
+            "sl": "auto",
+            "tl": target_lang,
+            "dt": "t",
+            "q": text,
+        },
+        timeout=10.0,
+    )
+    if resp.status_code != 200:
+        return None
+    data = resp.json()
+    # Google翻译返回嵌套列表，提取翻译文本
+    translated = ""
+    for part in data[0]:
+        if part[0]:
+            translated += part[0]
+    if translated:
+        return translated.strip()
+    return None
+
+
+async def _translate_api2(text, target_lang):
+    """MyMemory 翻译API（备用）"""
     client = _get_http_client()
     resp = await client.get(
         "https://api.mymemory.translated.net/get",
@@ -25,31 +53,31 @@ async def _translate_api1(text, target_lang):
     )
     data = resp.json()
     if data.get("responseStatus") == 200:
-        return data["responseData"]["translatedText"]
-    return None
-
-
-async def _translate_api2(text, target_lang):
-    """LibreTranslate 翻译API"""
-    client = _get_http_client()
-    resp = await client.post(
-        "https://libretranslate.de/translate",
-        json={"q": text, "source": "auto", "target": target_lang, "format": "text"},
-        timeout=10.0,
-    )
-    data = resp.json()
-    if "translatedText" in data:
-        return data["translatedText"]
+        result = data["responseData"]["translatedText"]
+        # MyMemory有时返回大写警告，过滤掉
+        if result.upper() == "MYMEMORY WARNING:" or len(result) < len(text) * 0.1:
+            return None
+        return result
     return None
 
 
 async def _translate_api3(text, target_lang):
-    """Lingva 翻译API（Google翻译前端）"""
+    """Lingva 翻译API（Google翻译前端，备用）"""
     client = _get_http_client()
-    resp = await client.get(f"https://lingva.ml/api/v1/auto/{target_lang}/{text}", timeout=10.0)
-    data = resp.json()
-    if "translation" in data:
-        return data["translation"]
+    # 尝试多个Lingva实例
+    instances = ["lingva.ml", "lingva.thedaviddelta.com", "lingva.lunar.icu"]
+    for instance in instances:
+        try:
+            resp = await client.get(
+                f"https://{instance}/api/v1/auto/{target_lang}/{text}",
+                timeout=8.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if "translation" in data:
+                    return data["translation"]
+        except Exception:
+            continue
     return None
 
 
