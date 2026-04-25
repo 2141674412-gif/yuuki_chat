@@ -716,10 +716,12 @@ async def handle_image_chat(event: MessageEvent):
     if gid and gid not in ALLOWED_GROUPS:
         return
 
-    # 群聊需要@bot才触发，私聊直接触发
+    # 群聊需要@bot或提到bot名字才触发，私聊直接触发
     if gid:
-        is_at_me = getattr(event, 'to_me', False) or "希亚" in str(event.message) or "Noa" in str(event.message)
-        if not is_at_me:
+        msg_str = str(event.message)
+        is_at_me = getattr(event, 'to_me', False)
+        is_mentioned = any(name in msg_str for name in ["希亚", "noa", "Noa", "结城", "正义的伙伴"])
+        if not is_at_me and not is_mentioned:
             return
 
     # 检查消息是否包含图片
