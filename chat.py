@@ -781,7 +781,8 @@ async def handle_image_chat(event: MessageEvent):
         _should_try_accounting = len(plain) <= 10 and not any(kw in plain for kw in ["看", "这是", "什么", "多少", "谁", "哪", "为什么", "怎么", "如何"])
 
         if _should_try_accounting:
-            _classify_prompt = """只看这张图片，判断是否是支付/收款/账单截图（微信支付、支付宝、银行APP等）。
+            _classify_prompt = """只看这张图片，判断是否是支付/收款/账单/银行短信通知截图。
+包括：微信支付、支付宝、银行APP、银行短信通知、信用卡账单等。
 只回复一个词：是 或 否"""
 
             classify_content = []
@@ -809,21 +810,27 @@ async def handle_image_chat(event: MessageEvent):
                     classify_result = classify_resp.choices[0].message.content.strip()
                     if "是" in classify_result and "否" not in classify_result:
                         # 是支付截图，进入记账模式
-                        _accounting_prompt = """请仔细观察这张图片，这是一张支付/收款截图。请提取以下信息，严格按JSON格式回复，不要有任何其他文字：
-{"amount": 金额数字, "category": "分类", "note": "备注", "type": "expense或income"}
+                        _accounting_prompt = """请仔细观察这张图片，这是一张支付/收款/银行短信截图。请提取所有交易记录。
+
+如果只有一笔交易，回复：
+{"records": [{"amount": 金额数字, "category": "分类", "note": "备注", "type": "expense或income"}]}
+
+如果有多笔交易，回复：
+{"records": [{"amount": 金额, "category": "分类", "note": "备注", "type": "类型"}, ...]}
 
 分类规则（选最匹配的）：
 餐饮、交通、购物、娱乐、住房、学习、医疗、收入、其他
 
 type规则：
-- 支出（付款/消费/花钱）→ "expense"
-- 收入（收款/到账/退款）→ "income"
+- 支出（付款/消费/花钱/转账支出）→ "expense"
+- 收入（收款/到账/退款/转入）→ "income"
 
-如果无法识别金额，回复：{"error": "无法识别"}
+如果无法识别任何金额，回复：{"error": "无法识别"}
 
-示例：
-{"amount": 25.0, "category": "餐饮", "note": "午餐", "type": "expense"}
-{"amount": 100.0, "category": "收入", "note": "红包", "type": "income"}"""
+注意：
+- 银行短信中"+"开头的是收入，"-"开头的是支出
+- 只提取明确的交易金额，忽略余额
+- 忽略0.01元以下的微小金额（可能是手续费调整）"""
 
                         user_content = []
                         for img_b64 in images_b64:
@@ -846,16 +853,24 @@ type规则：
                         if response.choices and response.choices[0].message.content:
                             reply = response.choices[0].message.content.strip()
                             import json
-                            json_match = re.search(r'\{[^}]+\}', reply)
+                            json_match = re.search(r'\{.*\}', reply, re.DOTALL)
                             if json_match:
                                 try:
                                     data = json.loads(json_match.group())
                                     if not data.get("error"):
-                                        amount = float(data.get("amount", 0))
-                                        if amount > 0:
-                                            category = data.get("category", "其他")
-                                            note = data.get("note", category)
-                                            record_type = data.get("type", "expense")
+                                        records = data.get("records", [])
+                                        # 兼容旧格式（单条无records字段）
+                                        if not records and "amount" in data:
+                                            records = [data]
+
+                                        saved_count = 0
+                                        for rec in records:
+                                            amount = float(rec.get("amount", 0))
+                                            if amount <= 0:
+                                                continue
+                                            category = rec.get("category", "其他")
+                                            note = rec.get("note", category)
+                                            record_type = rec.get("type", "expense")
 
                                             from .commands_accounting import _accounting, _save_accounting
                                             uid = str(event.user_id)
@@ -870,10 +885,16 @@ type规则：
                                             if uid not in _accounting:
                                                 _accounting[uid] = []
                                             _accounting[uid].append(record)
-                                            _save_accounting(_accounting)
+                                            saved_count += 1
 
-                                            icon = "📥" if record_type == "income" else "📤"
-                                            await _img_chat.finish(f"{icon} 已记录：{category} {note} {'+' if record_type=='income' else '-'}{amount:.0f}")
+                                        if saved_count > 0:
+                                            _save_accounting(_accounting)
+                                            if saved_count == 1:
+                                                r = records[0] if records else {}
+                                                icon = "📥" if r.get("type") == "income" else "📤"
+                                                await _img_chat.finish(f"{icon} 已记录：{r.get('category','其他')} {r.get('note','')} {'+' if r.get('type')=='income' else '-'}{float(r.get('amount',0)):.0f}")
+                                            else:
+                                                await _img_chat.finish(f"✅ 已记录 {saved_count} 笔交易。")
                                 except (json.JSONDecodeError, ValueError):
                                     pass
                             # 识别失败，走正常识图
