@@ -210,28 +210,23 @@ async def _cmd_search(event: MessageEvent):
 
     search_fns = [_search_ddg, _search_wiki, _search_bing, _search_baidu]
     tasks = [asyncio.create_task(_safe_search(fn, content)) for fn in search_fns]
+    all_results = []
     try:
-        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED, timeout=15.0)
         for t in done:
             results = t.result()
-            if results and len(results) >= 2:
-                for p in pending:
-                    p.cancel()
-                # 缓存
-                _search_cache[cache_key] = {"results": results, "time": time.time()}
-                if len(_search_cache) > 50:
-                    oldest = min(_search_cache, key=lambda k: _search_cache[k]["time"])
-                    del _search_cache[oldest]
-                await search_cmd.finish("\n".join(results[:6]))
-        if pending:
-            done2, pending2 = await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
-            for t in done2:
-                results = t.result()
-                if results:
-                    _search_cache[cache_key] = {"results": results, "time": time.time()}
-                    await search_cmd.finish("\n".join(results[:6]))
+            if results:
+                all_results.extend(results)
     except Exception as e:
         logger.debug(f"[搜索] {e}")
+
+    if all_results:
+        # 缓存
+        _search_cache[cache_key] = {"results": all_results, "time": time.time()}
+        if len(_search_cache) > 50:
+            oldest = min(_search_cache, key=lambda k: _search_cache[k]["time"])
+            del _search_cache[oldest]
+        await search_cmd.finish("\n".join(all_results[:6]))
 
     await search_cmd.finish(f"...没搜到「{content}」的相关结果。换个关键词试试？")
 
