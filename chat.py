@@ -870,11 +870,10 @@ type规则：
 
 如果无法识别任何金额，回复：{"error": "无法识别"}
 
-重要规则：
-- 只提取交易金额，绝对不要提取余额！
-- "余额XXX元"是账户余额不是交易，必须忽略
+规则：
 - 银行短信中"+"开头的是收入，"-"开头的是支出
-- 忽略0.01元以下的微小金额"""
+- 忽略0.01元以下的微小金额
+- 每条记录的note字段请写商户名或交易描述（如"达美乐比萨"、"饿了么"、"退款"等）"""
 
                         user_content = []
                         for img_b64 in images_b64:
@@ -906,6 +905,21 @@ type规则：
                                         # 兼容旧格式（单条无records字段）
                                         if not records and "amount" in data:
                                             records = [data]
+
+                                        # 后处理：过滤余额
+                                        # 1. 去掉note含"余额"的记录
+                                        records = [r for r in records if "余额" not in r.get("note", "") and "余额" not in r.get("category", "")]
+                                        # 2. 如果有多条记录，去掉金额与其他记录完全相同的（余额常与某笔交易金额相同）
+                                        if len(records) > 1:
+                                            seen_amounts = []
+                                            filtered = []
+                                            for r in records:
+                                                amt = float(r.get("amount", 0))
+                                                if amt in seen_amounts:
+                                                    continue  # 重复金额，可能是余额
+                                                seen_amounts.append(amt)
+                                                filtered.append(r)
+                                            records = filtered
 
                                         saved_count = 0
                                         for rec in records:
