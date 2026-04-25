@@ -516,6 +516,10 @@ async def handle_chatter(event: GroupMessageEvent):
     if event.group_id not in ALLOWED_GROUPS:
         return
 
+    # 跳过包含图片的消息（交给识图handler处理）
+    if any(seg.type == "image" for seg in event.message):
+        return
+
     message = str(event.message)
 
     # 跳过命令、CQ码、空消息
