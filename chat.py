@@ -734,6 +734,7 @@ async def handle_image_chat(event: MessageEvent):
     # 去掉可能的QQ昵称后检查文字长度
     _short_text = len(plain) <= 10
     _accounting_mode = (_has_accounting_keyword or _short_text) and not _has_bot_mention
+    logger.info(f"[图片理解] plain='{plain}', accounting={_accounting_mode}, keyword={_has_accounting_keyword}")
 
     # 群聊需要@bot或提到bot名字才触发，私聊直接触发
     # 但截图记账模式不需要@bot
@@ -766,7 +767,10 @@ async def handle_image_chat(event: MessageEvent):
                 break
 
     if not img_urls and not img_b64_list:
-        logger.warning(f"[图片理解] 未获取到图片URL, seg.data={seg.data if seg.type == 'image' else 'N/A'}")
+        # 打印所有segment数据帮助排查
+        for seg in event.message:
+            if seg.type == "image":
+                logger.warning(f"[图片理解] 图片segment数据: {seg.data}")
         return
 
     try:
