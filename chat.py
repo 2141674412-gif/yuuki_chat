@@ -747,6 +747,9 @@ async def handle_image_chat(event: MessageEvent):
     if not img_urls:
         return
 
+    # 检查是否是记账模式（用户发截图+提到"记"/"记账"）
+    _is_accounting_mode = any(kw in plain for kw in ["记", "记账", "记录"]) and not any(kw in plain for kw in ["忘记", "记得", "记忆", "日记", "笔记", "记录一下", "纪念"])
+
     try:
         # 下载并处理所有图片
         images_b64 = []
@@ -777,6 +780,95 @@ async def handle_image_chat(event: MessageEvent):
         vision_model = _cfg("vision_model", "glm-4v-flash")
         client = _get_client()
 
+        # 记账模式：提取金额和分类
+        if _is_accounting_mode:
+            _accounting_prompt = """请仔细观察这张图片，这是一张支付/收款截图。请提取以下信息，严格按JSON格式回复，不要有任何其他文字：
+{"amount": 金额数字, "category": "分类", "note": "备注", "type": "expense或income"}
+
+分类规则（选最匹配的）：
+餐饮、交通、购物、娱乐、住房、学习、医疗、收入、其他
+
+type规则：
+- 支出（付款/消费/花钱）→ "expense"
+- 收入（收款/到账/退款）→ "income"
+
+如果无法识别金额，回复：{"error": "无法识别"}
+
+示例：
+{"amount": 25.0, "category": "餐饮", "note": "午餐", "type": "expense"}
+{"amount": 100.0, "category": "收入", "note": "红包", "type": "income"}"""
+
+            user_content = []
+            for img_b64 in images_b64:
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
+                })
+            user_content.append({"type": "text", "text": _accounting_prompt})
+
+            loop = asyncio.get_running_loop()
+
+            def _do_accounting_vision():
+                return client.chat.completions.create(
+                    model=vision_model,
+                    messages=[
+                        {"role": "user", "content": user_content},
+                    ],
+                    max_tokens=256,
+                    temperature=0.1,  # 低温度确保格式稳定
+                    timeout=30.0
+                )
+
+            response = await loop.run_in_executor(None, _do_accounting_vision)
+            if not response.choices or not response.choices[0].message.content:
+                return
+
+            reply = response.choices[0].message.content.strip()
+            # 提取JSON
+            import json
+            json_match = re.search(r'\{[^}]+\}', reply)
+            if not json_match:
+                await _img_chat.send("...看不清这张截图。")
+                return
+
+            try:
+                data = json.loads(json_match.group())
+                if data.get("error"):
+                    await _img_chat.send("...看不清这张截图里的金额。")
+                    return
+
+                amount = float(data.get("amount", 0))
+                if amount <= 0:
+                    await _img_chat.send("...看不清这张截图里的金额。")
+                    return
+
+                category = data.get("category", "其他")
+                note = data.get("note", category)
+                record_type = data.get("type", "expense")
+
+                # 调用记账
+                from .commands_accounting import _accounting, _save_accounting
+                uid = str(event.user_id)
+                now = datetime.now()
+                record = {
+                    "amount": amount,
+                    "category": category,
+                    "note": note,
+                    "date": now.strftime("%m-%d %H:%M"),
+                    "type": record_type,
+                }
+                if uid not in _accounting:
+                    _accounting[uid] = []
+                _accounting[uid].append(record)
+                _save_accounting(_accounting)
+
+                icon = "📥" if record_type == "income" else "📤"
+                await _img_chat.finish(f"{icon} 已记录：{category} {note} {'+' if record_type=='income' else '-'}{amount:.0f}")
+            except (json.JSONDecodeError, ValueError) as e:
+                await _img_chat.send(f"...识别失败了。{str(e)[:50]}")
+            return
+
+        # 正常识图模式
         # 构建消息内容
         user_content = []
 
