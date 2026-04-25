@@ -898,8 +898,8 @@ type规则：
                                 except (json.JSONDecodeError, ValueError):
                                     pass
                             # 识别失败，走正常识图
-            except Exception:
-                pass  # 分类失败，走正常识图
+            except Exception as e:
+                logger.warning(f"[截图记账] 分类/识别失败: {e}")
 
         # 正常识图模式
         # 构建消息内容
@@ -954,8 +954,12 @@ type规则：
             _history_timestamps[user_id] = time.time()
             await _img_chat.finish(reply)
     except Exception as e:
-        # 模型不支持视觉或请求失败，静默忽略
-        logger.debug(f"[图片理解] 失败: {type(e).__name__}: {str(e)[:100]}")
+        # 模型不支持视觉或请求失败
+        logger.warning(f"[图片理解] 失败: {type(e).__name__}: {str(e)[:100]}")
+        try:
+            await _img_chat.send("...图片理解功能暂时不可用，稍后再试试。")
+        except Exception:
+            pass
 
 
 # ========== 定时主动发言 ==========
