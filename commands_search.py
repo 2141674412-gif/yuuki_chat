@@ -1,8 +1,9 @@
-# 搜索模块（DuckDuckGo + Wikipedia + Bing + 图片搜索）
+# 搜索模块（Wikipedia + DuckDuckGo + Bing + 百度 + 图片搜索）
 
 import asyncio
 import re
 import time
+import html
 
 from nonebot import logger
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
@@ -10,12 +11,88 @@ from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
 from .commands_base import _register, _get_http_client
 
 # 搜索缓存（5分钟TTL）
-_search_cache: dict = {}  # {query: {"results": list, "time": float}}
+_search_cache: dict = {}
 _SEARCH_TTL = 300
 
 
+def _clean_html(text: str) -> str:
+    """清理HTML标签和实体"""
+    text = re.sub(r'<[^>]+>', '', text)
+    text = html.unescape(text)
+    # 清理多余空白
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def _is_chinese(text: str) -> bool:
+    """检查文本是否包含中文"""
+    return bool(re.search(r'[\u4e00-\u9fff]', text))
+
+
+def _is_quality_result(title: str, desc: str) -> bool:
+    """检查结果质量"""
+    # 过滤太短的描述
+    if len(desc) < 15:
+        return False
+    # 过滤纯导航/下载站
+    junk_patterns = [
+        r'下载', r'免费', r'官网', r'首页', r'登录', r'注册',
+        r'有问题，就会有答案',  # 知乎底部水印
+        r'百度一下', r'百度百科',
+    ]
+    for p in junk_patterns:
+        if re.search(p, desc) and len(desc) < 50:
+            return False
+    return True
+
+
+async def _search_wiki(query):
+    """Wikipedia 中文摘要（优先）"""
+    try:
+        client = _get_http_client()
+        headers = {"User-Agent": "MaiBot/1.0"}
+        resp = await client.get(
+            "https://zh.wikipedia.org/w/api.php",
+            params={
+                "action": "query", "list": "search", "srsearch": query,
+                "format": "json", "utf8": 1, "srlimit": 1,
+            },
+            headers=headers, timeout=10.0,
+        )
+        data = resp.json()
+        search_results = data.get("query", {}).get("search", [])
+        if not search_results:
+            return None
+        title = search_results[0].get("title", "")
+        resp2 = await client.get(
+            "https://zh.wikipedia.org/w/api.php",
+            params={
+                "action": "query", "prop": "extracts", "exintro": 1,
+                "explaintext": 1, "titles": title, "format": "json", "utf8": 1,
+            },
+            headers=headers, timeout=10.0,
+        )
+        data2 = resp2.json()
+        pages = data2.get("query", {}).get("pages", {})
+        for pid, page in pages.items():
+            extract = page.get("extract", "").strip()
+            if extract:
+                if len(extract) > 400:
+                    extract = extract[:400] + "..."
+                return {
+                    "source": "wiki",
+                    "title": title,
+                    "desc": extract,
+                    "url": f"https://zh.wikipedia.org/wiki/{title}",
+                }
+            return None
+    except Exception as e:
+        logger.warning(f"[搜索Wiki] 失败: {e}")
+        return None
+
+
 async def _search_ddg(query):
-    """DuckDuckGo 即时回答 API"""
+    """DuckDuckGo 即时回答"""
     try:
         client = _get_http_client()
         resp = await client.get(
@@ -27,127 +104,80 @@ async def _search_ddg(query):
         abstract = data.get("Abstract", "").strip()
         heading = data.get("Heading", "").strip()
         url = data.get("AbstractURL", "").strip()
-        related = data.get("RelatedTopics", [])
-        results = []
-        if heading and abstract:
-            results.append(f"【{heading}】\n{abstract}")
-            if url:
-                results.append(f"🔗 {url}")
-        # 相关主题（取前3个有文本的，过滤分类链接）
-        count = 0
-        for topic in related:
-            if count >= 3:
-                break
-            text = topic.get("Text", "").strip()
-            link = topic.get("FirstURL", "").strip()
-            if text:
-                # 过滤DuckDuckGo分类链接（不太有用）
-                if link and "/c/" in link:
-                    continue
-                results.append(f"• {text}")
-                if link:
-                    results.append(f"  🔗 {link}")
-                count += 1
-        return results
+
+        # 过滤英文维基（中文搜索不需要）
+        if url and "en.wikipedia.org" in url:
+            return None
+
+        if heading and abstract and len(abstract) > 20:
+            return {
+                "source": "ddg",
+                "title": heading,
+                "desc": abstract,
+                "url": url,
+            }
     except Exception as e:
         logger.warning(f"[搜索DDG] 失败: {e}")
         return None
 
 
-async def _search_wiki(query):
-    """Wikipedia 中文摘要"""
-    try:
-        client = _get_http_client()
-        headers = {"User-Agent": "MaiBot/1.0"}
-        resp = await client.get(
-            "https://zh.wikipedia.org/w/api.php",
-            params={"action": "query", "list": "search", "srsearch": query, "format": "json", "utf8": 1, "srlimit": 1},
-            headers=headers,
-            timeout=10.0,
-        )
-        data = resp.json()
-        search_results = data.get("query", {}).get("search", [])
-        if not search_results:
-            return None
-        title = search_results[0].get("title", "")
-        resp2 = await client.get(
-            "https://zh.wikipedia.org/w/api.php",
-            params={"action": "query", "prop": "extracts", "exintro": 1, "explaintext": 1, "titles": title, "format": "json", "utf8": 1},
-            headers=headers,
-            timeout=10.0,
-        )
-        data2 = resp2.json()
-        pages = data2.get("query", {}).get("pages", {})
-        for pid, page in pages.items():
-            extract = page.get("extract", "").strip()
-            if extract:
-                if len(extract) > 500:
-                    extract = extract[:500] + "..."
-                return [f"📖 【{title}】（维基百科）\n{extract}", f"🔗 https://zh.wikipedia.org/wiki/{title}"]
-            return None
-    except Exception as e:
-        logger.warning(f"[搜索Wiki] 失败: {e}")
-        return None
-
-
 async def _search_bing(query):
-    """Bing 搜索摘要"""
+    """Bing 搜索（取前3个高质量结果）"""
     try:
         client = _get_http_client()
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         resp = await client.get(
             "https://www.bing.com/search",
             params={"q": query, "setlang": "zh-Hans"},
-            headers=headers,
-            timeout=10.0,
+            headers=headers, timeout=10.0,
         )
         if resp.status_code != 200:
             return None
         text = resp.text
         results = []
         blocks = re.split(r'class="b_algo"', text)
-        for block in blocks[1:5]:  # 取前4个结果
+        for block in blocks[1:6]:
             title_m = re.search(r'<h2[^>]*>.*?<a[^>]*>(.*?)</a>', block, re.DOTALL)
             desc_m = re.search(r'<p[^>]*>(.*?)</p>', block, re.DOTALL)
+            if not desc_m:
+                desc_m = re.search(r'class="b_caption"[^>]*>.*?<p[^>]*>(.*?)</p>', block, re.DOTALL)
             if title_m and desc_m:
-                title = re.sub(r'<[^>]+>', '', title_m.group(1)).strip()
-                desc = re.sub(r'<[^>]+>', '', desc_m.group(1)).strip()
-                if title and desc and len(desc) > 5:
-                    results.append(f"【{title}】\n{desc}")
-        return results if results else None
+                title = _clean_html(title_m.group(1))
+                desc = _clean_html(desc_m.group(1))
+                if _is_quality_result(title, desc):
+                    results.append({"source": "bing", "title": title, "desc": desc})
+        return results[:3] if results else None
     except Exception as e:
         logger.warning(f"[搜索Bing] 失败: {e}")
         return None
 
 
 async def _search_baidu(query):
-    """百度搜索摘要（备用）"""
+    """百度搜索（备用）"""
     try:
         client = _get_http_client()
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         resp = await client.get(
             "https://www.baidu.com/s",
             params={"wd": query},
-            headers=headers,
-            timeout=10.0,
+            headers=headers, timeout=10.0,
         )
         if resp.status_code != 200:
             return None
         text = resp.text
         results = []
-        # 百度搜索结果块
         blocks = re.split(r'class="result"', text)
-        for block in blocks[1:4]:
+        for block in blocks[1:5]:
             title_m = re.search(r'<h3[^>]*>.*?<a[^>]*>(.*?)</a>', block, re.DOTALL)
             desc_m = re.search(r'<span class="content-right_[^"]*">(.*?)</span>', block, re.DOTALL)
             if not desc_m:
                 desc_m = re.search(r'class="c-abstract[^"]*"[^>]*>(.*?)</div>', block, re.DOTALL)
             if title_m and desc_m:
-                title = re.sub(r'<[^>]+>', '', title_m.group(1)).strip()
-                desc = re.sub(r'<[^>]+>', '', desc_m.group(1)).strip()
-                if title and desc and len(desc) > 5:
-                    results.append(f"【{title}】\n{desc}")
-        return results if results else None
+                title = _clean_html(title_m.group(1))
+                desc = _clean_html(desc_m.group(1))
+                if _is_quality_result(title, desc):
+                    results.append({"source": "baidu", "title": title, "desc": desc})
+        return results[:3] if results else None
     except Exception as e:
         logger.warning(f"[搜索Baidu] 失败: {e}")
         return None
@@ -161,19 +191,16 @@ async def _search_images(query, count=3):
         resp = await client.get(
             "https://www.bing.com/images/search",
             params={"q": query, "first": 1, "count": count, "setlang": "zh-Hans"},
-            headers=headers,
-            timeout=10.0,
+            headers=headers, timeout=10.0,
         )
         if resp.status_code != 200:
             return None
         text = resp.text
         images = []
-        # 提取图片URL
         img_urls = re.findall(r'murl&quot;:&quot;(.*?)&quot;', text)
         if not img_urls:
             img_urls = re.findall(r'"murl":"(.*?)"', text)
         if not img_urls:
-            # 备用模式
             img_urls = re.findall(r'src="(https://tse\d+\.mm\.bing\.net/[^"]+)"', text)
         for url in img_urls[:count]:
             if url.startswith("http"):
@@ -182,6 +209,63 @@ async def _search_images(query, count=3):
     except Exception as e:
         logger.warning(f"[搜图] 失败: {e}")
         return None
+
+
+def _format_results(raw_results: list) -> str:
+    """格式化搜索结果，去重+排序"""
+    # 分类：百科类（单条高质量）和列表类（多条）
+    wiki_results = []
+    list_results = []
+    seen_titles = set()
+
+    for r in raw_results:
+        if isinstance(r, dict):
+            title = r.get("title", "")
+            if title in seen_titles:
+                continue
+            seen_titles.add(title)
+
+            if r.get("source") == "wiki":
+                wiki_results.append(r)
+            elif r.get("source") == "ddg":
+                wiki_results.append(r)
+            else:
+                list_results.append(r)
+        elif isinstance(r, list):
+            for item in r:
+                title = item.get("title", "")
+                if title in seen_titles:
+                    continue
+                seen_titles.add(title)
+                list_results.append(item)
+
+    # 格式化输出
+    lines = []
+
+    # 百科结果（最多1条）
+    if wiki_results:
+        w = wiki_results[0]
+        lines.append(f"📖 【{w['title']}】")
+        lines.append(w['desc'])
+        if w.get('url'):
+            lines.append(f"🔗 {w['url']}")
+        lines.append("")
+
+    # 列表结果（最多3条）
+    count = 0
+    for r in list_results:
+        if count >= 3:
+            break
+        title = r.get("title", "")
+        desc = r.get("desc", "")
+        # 过滤和百科重复的
+        if wiki_results and title == wiki_results[0].get("title", ""):
+            continue
+        lines.append(f"【{title}】")
+        lines.append(desc)
+        count += 1
+
+    return "\n".join(lines).strip()
 
 
 async def _cmd_search(event: MessageEvent):
@@ -200,7 +284,7 @@ async def _cmd_search(event: MessageEvent):
     if cache_key in _search_cache:
         cached = _search_cache[cache_key]
         if time.time() - cached["time"] < _SEARCH_TTL:
-            await search_cmd.finish("\n".join(cached["results"][:6]))
+            await search_cmd.finish(cached["text"])
 
     await search_cmd.send("正在搜索中...")
 
@@ -220,17 +304,22 @@ async def _cmd_search(event: MessageEvent):
         for t in done:
             results = t.result()
             if results:
-                all_results.extend(results)
+                if isinstance(results, list):
+                    all_results.extend(results)
+                else:
+                    all_results.append(results)
     except Exception as e:
         logger.debug(f"[搜索] {e}")
 
     if all_results:
-        # 缓存
-        _search_cache[cache_key] = {"results": all_results, "time": time.time()}
-        if len(_search_cache) > 50:
-            oldest = min(_search_cache, key=lambda k: _search_cache[k]["time"])
-            del _search_cache[oldest]
-        await search_cmd.finish("\n".join(all_results[:6]))
+        text = _format_results(all_results)
+        if text:
+            # 缓存
+            _search_cache[cache_key] = {"text": text, "time": time.time()}
+            if len(_search_cache) > 50:
+                oldest = min(_search_cache, key=lambda k: _search_cache[k]["time"])
+                del _search_cache[oldest]
+            await search_cmd.finish(text)
 
     await search_cmd.finish(f"...没搜到「{content}」的相关结果。换个关键词试试？")
 
@@ -252,7 +341,6 @@ async def _cmd_image_search(event: MessageEvent):
     if not images:
         await img_search_cmd.finish(f"...没搜到「{content}」的图片。换个关键词试试？")
 
-    # 发送图片
     msg = MessageSegment.text(f"🖼️ 「{content}」的搜索结果：\n")
     for i, url in enumerate(images):
         msg += MessageSegment.image(url)
