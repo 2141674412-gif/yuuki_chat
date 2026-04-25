@@ -39,7 +39,7 @@ COMMAND_NAMES = [
     "计算器",
     "翻译",
     "汇率",
-    "搜索", "搜一下", "查一查",
+    "搜索", "搜一下", "查一查", "搜图", "图片搜索", "imgsearch",
     "天气", "weather", "绑定天气", "bindweather", "解绑天气", "unbindweather",
     "我的天气", "myweather", "setcity",
     "生日", "birthday", "设置生日", "setbirthday", "setbirth", "删除生日", "delbirthday", "delbirth",
