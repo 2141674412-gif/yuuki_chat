@@ -1,6 +1,7 @@
 # 标准库
 import asyncio
 import base64
+import json
 import os
 import random
 import re
@@ -140,6 +141,57 @@ chat_history = {}
 _group_chat_log = {}  # {group_id: [(timestamp, user_id, text), ...]}
 _GROUP_CHAT_LOG_TTL = 7 * 24 * 3600  # 保留最近 7 天的数据（秒）
 
+# 主人QQ号（模块级常量）
+_OWNER_ID = "2141674412"
+
+# 用户画像记忆（记住用户喜好/话题/习惯）
+_user_profiles = {}  # {user_id: {"topics": [...], "mentioned_count": int, "last_active": float}}
+_PROFILE_FILE = os.path.join(DATA_DIR, "user_profiles.json")
+
+def _load_user_profiles():
+    global _user_profiles
+    try:
+        if os.path.exists(_PROFILE_FILE):
+            with open(_PROFILE_FILE, "r", encoding="utf-8") as f:
+                _user_profiles = json.load(f)
+    except Exception:
+        pass
+
+def _save_user_profiles():
+    try:
+        with open(_PROFILE_FILE, "w", encoding="utf-8") as f:
+            json.dump(_user_profiles, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+def _update_user_profile(user_id: str, message: str):
+    """更新用户画像"""
+    if user_id not in _user_profiles:
+        _user_profiles[user_id] = {"topics": [], "mentioned_count": 0, "last_active": 0, "name": ""}
+    profile = _user_profiles[user_id]
+    profile["last_active"] = time.time()
+    # 提取关键词作为话题标签
+    for keyword in _TOPIC_KEYWORDS:
+        if keyword in message and keyword not in profile["topics"]:
+            profile["topics"].append(keyword)
+            if len(profile["topics"]) > 20:
+                profile["topics"] = profile["topics"][-20:]
+    # 定期保存
+    if random.random() < 0.1:  # 10%概率保存，避免频繁IO
+        _save_user_profiles()
+
+def _get_user_context(user_id: str) -> str:
+    """获取用户上下文信息（用于AI prompt）"""
+    if user_id not in _user_profiles:
+        return ""
+    profile = _user_profiles[user_id]
+    parts = []
+    if profile.get("topics"):
+        parts.append(f"这个用户经常聊: {', '.join(profile['topics'][-5:])}")
+    if profile.get("mentioned_count", 0) > 10:
+        parts.append("这个用户经常和你聊天，算是老熟人了")
+    return "\n".join(parts) if parts else ""
+
 
 def _cleanup_group_chat_log():
     """清理超过 7 天的群消息记录"""
@@ -179,6 +231,9 @@ def _cleanup_old_histories():
 
 # 将命令列表转为集合，加速查找
 COMMAND_SET = set(COMMAND_NAMES)
+
+# 加载用户画像数据
+_load_user_profiles()
 
 # ========== 艾特检测（睡觉模式） ==========
 
@@ -316,6 +371,13 @@ async def handle_chat(event: MessageEvent):
     # 加载当前人设
     system_prompt = load_persona()
 
+    # 对特定用户特殊对待
+    if user_id == _OWNER_ID:
+        system_prompt += "\n\n[特殊指令] 这是希亚最亲密的人（主人/搭档），对Ta要更加亲昵、依赖、偶尔撒娇，可以叫Ta'笨蛋'但语气要甜。不要用敬语，像对很熟的人一样随意。回复可以更长更详细。"
+    else:
+        # 普通用户保持正常距离感
+        system_prompt += "\n\n[指令] 对普通群友保持礼貌但有点距离感，不要太过亲密。回复简短自然即可。"
+
     # 初始化对话历史
     if user_id not in chat_history:
         chat_history[user_id] = [
@@ -332,11 +394,16 @@ async def handle_chat(event: MessageEvent):
         loop = asyncio.get_running_loop()
         messages = list(chat_history[user_id])  # 复制到局部变量，避免线程竞态
 
+        # 添加用户上下文到system prompt
+        user_context = _get_user_context(user_id)
+        if user_context:
+            messages[0] = {"role": "system", "content": messages[0]["content"] + "\n\n" + user_context}
+
         def _collect_stream():
             stream = client.chat.completions.create(
                 model=_cfg("model_name", "qwen2.5:7b-instruct"),
                 messages=messages,
-                max_tokens=int(_cfg("max_tokens", "512")),
+                max_tokens=int(_cfg("max_tokens", "1024")) if user_id == _OWNER_ID else int(_cfg("max_tokens", "512")),
                 temperature=float(_cfg("temperature", "0.7")),
                 timeout=20.0,
                 stream=True,
@@ -377,9 +444,13 @@ async def handle_chat(event: MessageEvent):
         chat_history[user_id].append({"role": "assistant", "content": ai_response})
         _history_timestamps[user_id] = time.time()
 
-        # 限制历史记录长度（只保留最近5轮对话）
-        if len(chat_history[user_id]) > 11:  # system + 5轮(user+assistant) = 11条
-            chat_history[user_id] = [chat_history[user_id][0]] + chat_history[user_id][-10:]
+        # 更新用户画像
+        _update_user_profile(user_id, message)
+
+        # 限制历史记录长度（主人保留更多上下文）
+        max_history = 21 if user_id == _OWNER_ID else 11  # 主人10轮，普通5轮
+        if len(chat_history[user_id]) > max_history:
+            chat_history[user_id] = [chat_history[user_id][0]] + chat_history[user_id][-(max_history-1):]
 
         # 检查是否需要附加表情包
         sticker_msg = get_sticker_message(ai_response)
@@ -606,7 +677,13 @@ async def handle_chatter(event: GroupMessageEvent):
         return
 
     # 用AI生成回复，失败时用预设话题兜底
-    reply = await _ai_generate_reply(message, _CHATTER_SYSTEM_PROMPT)
+    # 增强插话：加入用户上下文
+    user_context = _get_user_context(str(event.user_id))
+    if user_context:
+        enhanced_prompt = _CHATTER_SYSTEM_PROMPT + "\n\n" + user_context
+    else:
+        enhanced_prompt = _CHATTER_SYSTEM_PROMPT
+    reply = await _ai_generate_reply(message, enhanced_prompt)
     if not reply:
         reply = random.choice(_FALLBACK_TOPICS)
 
@@ -1225,14 +1302,30 @@ type规则：支出→"expense"，收入→"income"
         def _do_vision():
             # 加载完整人设作为system prompt
             persona = load_persona()
-            img_sys = persona + "\n\n---\n现在有人发了图片给你看，请仔细观察并给出自然的反应。不要像AI助手一样列条目，像日常聊天一样。如果图片有文字请说出来。"
+            img_sys = persona + "\n\n---\n现在有人发了图片给你看，请仔细观察并给出自然的反应。\n"
+            # 主人特殊对待
+            if str(event.user_id) == _OWNER_ID:
+                img_sys += "这是你最亲密的人发的图，反应可以更亲昵、更活泼。\n"
+            img_sys += (
+                "观察要点:\n"
+                "- 图片主要内容（人物/动物/物品/场景/截图等）\n"
+                "- 如果是截图，识别其中的文字内容和关键信息\n"
+                "- 如果是表情包/梗图，说出你觉得好笑或吐槽的点\n"
+                "- 如果是食物，评价一下看起来好不好吃\n"
+                "- 如果是自拍/照片，自然地夸或吐槽\n"
+                "回复要求:\n"
+                "- 像日常聊天一样自然，不要列条目\n"
+                "- 保持希亚的性格：傲娇、偶尔中二\n"
+                "- 如果图片有文字，请把文字内容说出来\n"
+                "- 不要用markdown格式，回复1-3句话"
+            )
             return client.chat.completions.create(
                 model=vision_model,
                 messages=[
                     {"role": "system", "content": img_sys},
                     {"role": "user", "content": user_content},
                 ],
-                max_tokens=int(_cfg("max_tokens", "512")),
+                max_tokens=int(_cfg("max_tokens", "1024")) if str(event.user_id) == _OWNER_ID else int(_cfg("max_tokens", "512")),
                 temperature=float(_cfg("temperature", "0.8")),
                 timeout=30.0
             )
@@ -1311,19 +1404,44 @@ async def _auto_chat_loop():
     except Exception as e:
         logger.debug(f"[自动发言] 读取上次发言时间失败: {e}")
 
-    # 主动发言的随机话题（给AI一些灵感）
-    proactive_hints = [
-        "群里现在很安静",
-        "到了下午茶时间了",
-        "今天好像没什么事",
+    # 主动发言的随机话题（给AI一些灵感，分时间段）
+    proactive_hints_morning = [
+        "早上好，新的一天开始了",
+        "今天天气怎么样呢",
+        "早餐吃了什么",
+        "早上好困啊",
+    ]
+    proactive_hints_afternoon = [
+        "群里好安静",
+        "下午茶时间到了",
         "有点无聊想找人聊天",
-        "刚吃完东西",
         "在看窗外的风景",
         "在想接下来做什么",
-        "突然想到了什么",
-        "该做点什么好呢",
-        "天气怎么样呢",
     ]
+    proactive_hints_evening = [
+        "今天过得怎么样",
+        "晚上有什么安排",
+        "肚子饿了想吃东西",
+        "在看什么好玩的",
+        "突然想到了什么",
+    ]
+    proactive_hints_night = [
+        "还不睡觉吗",
+        "夜深了呢",
+        "明天有什么计划",
+        "好安静啊",
+    ]
+
+    def _get_proactive_hints():
+        hour = time.localtime().hour
+        if 6 <= hour < 12:
+            return proactive_hints_morning
+        elif 12 <= hour < 18:
+            return proactive_hints_afternoon
+        elif 18 <= hour < 23:
+            return proactive_hints_evening
+        else:
+            return proactive_hints_night
 
     while True:
         try:
@@ -1338,7 +1456,15 @@ async def _auto_chat_loop():
             group_id = random.choice(_auto_chat_groups)
 
             # 用AI生成发言
-            hint = random.choice(proactive_hints)
+            # 获取群最近聊天记录作为上下文
+            recent_msgs = _group_chat_log.get(group_id, [])
+            if recent_msgs:
+                recent_summary = "最近群里聊了: " + ", ".join(
+                    msg[2][:20] for msg in recent_msgs[-5:]
+                )
+            else:
+                recent_summary = "群里最近没什么消息"
+            hint = f"{recent_summary}\n{random.choice(_get_proactive_hints())}"
             reply = await _ai_generate_reply(hint, _PROACTIVE_SYSTEM_PROMPT)
             if not reply:
                 reply = random.choice(_FALLBACK_TOPICS)
