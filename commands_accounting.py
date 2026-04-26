@@ -215,40 +215,37 @@ async def _cmd_bill(event: MessageEvent):
 
     lines = []
     if "今天" in content or "今日" in content:
-        title = f"[今日 {len(filtered)}笔]"
+        title = f"今日账单 ({len(filtered)}笔)"
     elif "昨天" in content or "昨日" in content:
-        title = f"[昨日 {len(filtered)}笔]"
+        title = f"昨日账单 ({len(filtered)}笔)"
     elif "本月" in content or "这个月" in content:
-        title = f"[本月 {len(filtered)}笔]"
+        title = f"本月账单 ({len(filtered)}笔)"
     else:
-        title = f"[账单 {len(filtered)}笔]"
+        title = f"账单 ({len(filtered)}笔)"
 
-    # 支出分类（按金额降序）
-    cat_lines = []
+    lines.append(title)
+
+    # 总支出/总收入
+    lines.append(f"支出 {_fmt_amount(expense_total)}  收入 +{_fmt_amount(income_total)}")
+
+    # 支出分类
     if expense_by_cat:
         sorted_cats = sorted(expense_by_cat.items(), key=lambda x: x[1], reverse=True)
-        for cat, amount in sorted_cats:
-            cat_lines.append(f"支{cat}-{_fmt_amount(amount)}")
+        cat_str = "  ".join(f"{cat} {_fmt_amount(amount)}" for cat, amount in sorted_cats)
+        lines.append(f"支出明细: {cat_str}")
 
     # 收入分类
     if income_by_cat:
         sorted_income = sorted(income_by_cat.items(), key=lambda x: x[1], reverse=True)
-        for cat, amount in sorted_income:
-            cat_lines.append(f"收{cat}+{_fmt_amount(amount)}")
+        inc_str = "  ".join(f"{cat} +{_fmt_amount(amount)}" for cat, amount in sorted_income)
+        lines.append(f"收入明细: {inc_str}")
 
+    # 结余
     net = income_total - expense_total
     if net >= 0:
-        cat_lines.append(f"结余+{net:.0f}")
+        lines.append(f"结余 +{net:.0f}")
     else:
-        cat_lines.append(f"结余{net:.0f}")
-
-    # 紧凑排版：分类一行，最多2个一行
-    lines.append(title)
-    for i in range(0, len(cat_lines), 2):
-        row = cat_lines[i]
-        if i + 1 < len(cat_lines):
-            row += "  " + cat_lines[i + 1]
-        lines.append(row)
+        lines.append(f"结余 {net:.0f}")
 
     # 显示余额（来自截图记账提取）
     balance = _accounting_balance.get(uid)
