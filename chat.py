@@ -684,7 +684,38 @@ async def handle_bilibili(event: MessageEvent):
         if seg.type == "text":
             full_text += seg.data.get("text", "")
         elif seg.type == "json":
-            full_text += seg.data.get("data", "")
+            raw_json = seg.data.get("data", "")
+            full_text += raw_json
+            # 尝试解析JSON，从jumpUrl等字段中提取B站链接
+            try:
+                import json
+                json_data = json.loads(raw_json)
+                # 递归查找所有包含B站链接的字段
+                def _find_bili_urls(obj):
+                    if isinstance(obj, str):
+                        if re.search(r'bilibili\.com/video/|b23\.tv/|BV[a-zA-Z0-9]{6,}', obj):
+                            return obj
+                    elif isinstance(obj, dict):
+                        for key in ("jumpUrl", "url", "targetUrl", "qqUrl", "sourceUrl"):
+                            if key in obj:
+                                result = _find_bili_urls(obj[key])
+                                if result:
+                                    return result
+                        for v in obj.values():
+                            result = _find_bili_urls(v)
+                            if result:
+                                return result
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            result = _find_bili_urls(item)
+                            if result:
+                                return result
+                    return None
+                extra_url = _find_bili_urls(json_data)
+                if extra_url:
+                    full_text += " " + extra_url
+            except (json.JSONDecodeError, TypeError):
+                pass
 
     # 检测B站链接或BV号
     if not re.search(r'bilibili\.com/video/|b23\.tv/|BV[a-zA-Z0-9]{6,}', full_text):
