@@ -407,7 +407,7 @@ def _setup_heartbeat():
 
 @_driver.on_startup
 async def _on_startup_heartbeat():
-    _write_heartbeat()
+    await _write_heartbeat()
     _setup_heartbeat()
     # 检查上次心跳
     try:

@@ -293,7 +293,14 @@ def _register(name, handler, aliases=None, priority=5, admin_only=False):
         # 频率限制（管理员不受限）
         if not admin_only and not _check_rate_limit(str(event.user_id)):
             return  # 冷却中，静默忽略
-        await handler(event)
+        try:
+            await handler(event)
+        except Exception as e:
+            logger.error(f"[命令] 执行失败: {type(e).__name__}: {e}")
+            try:
+                await _send_msg(event, f"...命令执行出错了: {type(e).__name__}")
+            except Exception:
+                pass
 
     if aliases:
         for a in aliases:
