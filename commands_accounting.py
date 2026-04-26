@@ -125,10 +125,10 @@ async def _cmd_record(event: MessageEvent):
         if not records:
             await _send(event, "...记什么。格式：/记 午饭 25\n或：/记 +100 工资")
         # 显示最近5条
-        lines = ["📋 最近记账：\n"]
+        lines = ["[最近记账]\n"]
         for r in records[-5:]:
-            icon = "📥" if r["type"] == "income" else "📤"
-            lines.append(f"{icon} {r['date']} {r['category']} {r['note']} {'+' if r['type']=='income' else '-'}{r['amount']:.0f}")
+            sign = "+" if r["type"] == "income" else "-"
+            lines.append(f"{sign} {r['date']} {r['category']} {r['note']} {sign}{r['amount']:.0f}")
         lines.append(f"\n共 {len(records)} 条记录")
         await _send(event, "\n".join(lines))
         return
@@ -162,8 +162,8 @@ async def _cmd_record(event: MessageEvent):
     _accounting[uid].append(record)
     _save_accounting(_accounting)
 
-    icon = "📥" if record_type == "income" else "📤"
-    await _send(event, f"{icon} 已记录：{category} {note} {'+' if record_type=='income' else '-'}{_fmt_amount(amount)}")
+    sign = "+" if record_type == "income" else "-"
+    await _send(event, f"已记录：{category} {note} {sign}{_fmt_amount(amount)}")
 
 
 async def _cmd_bill(event: MessageEvent):
@@ -215,32 +215,32 @@ async def _cmd_bill(event: MessageEvent):
 
     lines = []
     if "今天" in content or "今日" in content:
-        title = f"📊 今日（{len(filtered)}笔）"
+        title = f"[今日 {len(filtered)}笔]"
     elif "昨天" in content or "昨日" in content:
-        title = f"📊 昨日（{len(filtered)}笔）"
+        title = f"[昨日 {len(filtered)}笔]"
     elif "本月" in content or "这个月" in content:
-        title = f"📊 本月（{len(filtered)}笔）"
+        title = f"[本月 {len(filtered)}笔]"
     else:
-        title = f"📊 账单（{len(filtered)}笔）"
+        title = f"[账单 {len(filtered)}笔]"
 
     # 支出分类（按金额降序）
     cat_lines = []
     if expense_by_cat:
         sorted_cats = sorted(expense_by_cat.items(), key=lambda x: x[1], reverse=True)
         for cat, amount in sorted_cats:
-            cat_lines.append(f"📤{cat}-{_fmt_amount(amount)}")
+            cat_lines.append(f"支{cat}-{_fmt_amount(amount)}")
 
     # 收入分类
     if income_by_cat:
         sorted_income = sorted(income_by_cat.items(), key=lambda x: x[1], reverse=True)
         for cat, amount in sorted_income:
-            cat_lines.append(f"📥{cat}+{_fmt_amount(amount)}")
+            cat_lines.append(f"收{cat}+{_fmt_amount(amount)}")
 
     net = income_total - expense_total
     if net >= 0:
-        cat_lines.append(f"📈结余+{net:.0f}")
+        cat_lines.append(f"结余+{net:.0f}")
     else:
-        cat_lines.append(f"📉结余{net:.0f}")
+        cat_lines.append(f"结余{net:.0f}")
 
     # 紧凑排版：分类一行，最多2个一行
     lines.append(title)
@@ -253,15 +253,14 @@ async def _cmd_bill(event: MessageEvent):
     # 显示余额（来自截图记账提取）
     balance = _accounting_balance.get(uid)
     if balance is not None:
-        lines.append(f"💳 余额 {balance:.2f}")
+        lines.append(f"余额 {balance:.2f}")
 
     # 明细：只有带"明细"关键词才显示
     if "明细" in content or "详细" in content:
-        lines.append("─" * 12)
+        lines.append("-" * 12)
         for r in reversed(filtered):
-            icon = "📥" if r["type"] == "income" else "📤"
             sign = "+" if r["type"] == "income" else "-"
-            lines.append(f"{r['date']} {icon}{r['note']} {sign}{r['amount']:.0f}")
+            lines.append(f"{r['date']} {sign}{r['note']} {sign}{r['amount']:.0f}")
 
     await _send(event, "\n".join(lines))
 
@@ -313,10 +312,10 @@ async def _cmd_stats(event: MessageEvent):
 
     lines = []
     if "本月" in content or "这个月" in content:
-        lines.append(f"📈 本月消费统计")
+        lines.append("[本月消费统计]")
     else:
-        lines.append(f"📈 消费统计")
-    lines.append("─" * 20)
+        lines.append("[消费统计]")
+    lines.append("-" * 20)
     lines.append(f"总支出: -{total_expense:.0f}")
     lines.append(f"总收入: +{total_income:.0f}")
     lines.append(f"日均支出: -{total_expense/days:.0f}")
