@@ -194,45 +194,48 @@ async def _cmd_bill(event: MessageEvent):
 
     lines = []
     if "今天" in content or "今日" in content:
-        lines.append(f"📊 今日账单（{len(filtered)}笔）")
+        title = f"📊 今日（{len(filtered)}笔）"
     elif "昨天" in content or "昨日" in content:
-        lines.append(f"📊 昨日账单（{len(filtered)}笔）")
+        title = f"📊 昨日（{len(filtered)}笔）"
     elif "本月" in content or "这个月" in content:
-        lines.append(f"📊 本月账单（{len(filtered)}笔）")
+        title = f"📊 本月（{len(filtered)}笔）"
     else:
-        lines.append(f"📊 账单（{len(filtered)}笔）")
-
-    lines.append("")
+        title = f"📊 账单（{len(filtered)}笔）"
 
     # 支出分类（按金额降序）
+    cat_lines = []
     if expense_by_cat:
         sorted_cats = sorted(expense_by_cat.items(), key=lambda x: x[1], reverse=True)
         for cat, amount in sorted_cats:
-            lines.append(f"  📤 {cat}　-{amount:.2f}")
+            cat_lines.append(f"📤{cat}-{amount:.0f}")
 
     # 收入分类
     if income_by_cat:
         sorted_income = sorted(income_by_cat.items(), key=lambda x: x[1], reverse=True)
         for cat, amount in sorted_income:
-            lines.append(f"  📥 {cat}　+{amount:.2f}")
+            cat_lines.append(f"📥{cat}+{amount:.0f}")
 
-    lines.append("─" * 16)
-    lines.append(f"  💰 支出　-{expense_total:.2f}")
-    if income_total > 0:
-        lines.append(f"  💰 收入　+{income_total:.2f}")
     net = income_total - expense_total
     if net >= 0:
-        lines.append(f"  📈 结余　+{net:.2f}")
+        cat_lines.append(f"📈结余+{net:.0f}")
     else:
-        lines.append(f"  📉 结余　{net:.2f}")
+        cat_lines.append(f"📉结余{net:.0f}")
 
-    # 每笔明细
-    lines.append("")
-    lines.append("明细：")
-    for r in reversed(filtered):  # 最新的在前
-        icon = "📥" if r["type"] == "income" else "📤"
-        sign = "+" if r["type"] == "income" else "-"
-        lines.append(f"  {r['date']} {icon} {r['note']}　{sign}{r['amount']:.2f}")
+    # 紧凑排版：分类一行，最多2个一行
+    lines.append(title)
+    for i in range(0, len(cat_lines), 2):
+        row = cat_lines[i]
+        if i + 1 < len(cat_lines):
+            row += "  " + cat_lines[i + 1]
+        lines.append(row)
+
+    # 明细：只有带"明细"关键词才显示
+    if "明细" in content or "详细" in content:
+        lines.append("─" * 12)
+        for r in reversed(filtered):
+            icon = "📥" if r["type"] == "income" else "📤"
+            sign = "+" if r["type"] == "income" else "-"
+            lines.append(f"{r['date']} {icon}{r['note']} {sign}{r['amount']:.0f}")
 
     await bill_cmd.finish("\n".join(lines))
 
