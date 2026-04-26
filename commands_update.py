@@ -295,6 +295,12 @@ def _do_restart(user_id, event):
         subprocess.Popen([sys.executable, bot_path], cwd=project_dir)
         sys.stdout.flush()
         sys.stderr.flush()
+        # 通知Sentry忽略这次正常退出
+        try:
+            import sentry_sdk
+            sentry_sdk.flush()
+        except Exception:
+            pass
         sys.exit(0)
     except Exception as e:
         return str(e)
