@@ -27,7 +27,8 @@ from PIL import Image
 from qreader import QReader
 
 # 本地模块
-from .config import ALLOWED_GROUPS, COMMAND_NAMES, load_persona, DATA_DIR, CHAT_BLACKLIST, CHAT_WHITELIST
+from .config import ALLOWED_GROUPS, COMMAND_NAMES, load_persona, DATA_DIR, CHAT_WHITELIST
+from .commands_base import user_blacklist
 from .commands_sticker import get_sticker_message
 
 # ========== 配置读取（兼容 .env 大写和 section 两种格式） ==========
@@ -266,7 +267,7 @@ async def handle_chat(event: MessageEvent):
         return
 
     # 黑名单检查
-    if user_id in CHAT_BLACKLIST:
+    if user_id in user_blacklist:
         return
 
     # 如果消息包含图片，跳过（交给识图handler处理）

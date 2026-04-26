@@ -167,6 +167,8 @@ recall_cmd = _recall_cmd
 
 from nonebot.adapters.onebot.v11 import GroupIncreaseNoticeEvent, GroupMessageEvent as _GME
 
+import os
+
 _welcome_enabled = True  # 默认开启
 _welcome_msg = "欢迎 {nickname} 加入本群~"
 
@@ -174,8 +176,8 @@ def _load_welcome_config():
     global _welcome_enabled, _welcome_msg
     try:
         from .commands_base import _DATA_DIR
-        cfg_file = os.path.join(_DATA_DIR, "group_welcome.json") if 'os' in dir() else None
-        if cfg_file and os.path.exists(cfg_file):
+        cfg_file = os.path.join(_DATA_DIR, "group_welcome.json")
+        if os.path.exists(cfg_file):
             import json
             with open(cfg_file, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
@@ -184,7 +186,6 @@ def _load_welcome_config():
     except Exception:
         pass
 
-import os
 _load_welcome_config()
 
 _welcome_notice = on_notice(priority=5)

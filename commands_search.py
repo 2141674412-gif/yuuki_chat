@@ -358,6 +358,7 @@ async def _cmd_image_search(event: MessageEvent):
     images = await _search_images(content, count=3)
     if not images:
         await _send(event, f"...没搜到「{content}」的图片。换个关键词试试？")
+        return
 
     msg = MessageSegment.text(f"🖼️ 「{content}」的搜索结果：\n")
     for i, url in enumerate(images):
