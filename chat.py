@@ -665,6 +665,11 @@ def _extract_bili_url(text: str):
     m = re.search(r'BV[a-zA-Z0-9]+', text)
     return m.group(0) if m else ""
 
+def _extract_b23_url(text: str):
+    """从文本中提取b23.tv短链接"""
+    m = re.search(r'b23\.tv/([a-zA-Z0-9]+)', text)
+    return m.group(1) if m else ""
+
 def _format_num(n):
     if n is None:
         return "-"
@@ -674,6 +679,23 @@ def _format_num(n):
     elif n >= 10000:
         return f"{n / 10000:.1f}万"
     return str(n)
+
+async def _resolve_b23(client, short_id: str) -> str:
+    """解析b23.tv短链接，返回BV号"""
+    try:
+        resp = await client.get(
+            f"https://b23.tv/{short_id}",
+            headers=_BILI_HEADERS,
+            timeout=5.0,
+            follow_redirects=True
+        )
+        url = str(resp.url)
+        m = re.search(r'BV[a-zA-Z0-9]+', url)
+        if m:
+            return m.group(0)
+    except Exception as e:
+        logger.warning(f"[B站] 解析短链接失败: {e}")
+    return ""
 
 @_bili_chat.handle()
 async def handle_bilibili(event: MessageEvent):
@@ -686,45 +708,53 @@ async def handle_bilibili(event: MessageEvent):
         elif seg.type == "json":
             raw_json = seg.data.get("data", "")
             full_text += raw_json
-            # 调试：打印完整JSON数据
-            logger.info(f"[B站] JSON卡片数据: {raw_json[:2000]}")
-            # 尝试解析JSON，从jumpUrl等字段中提取B站链接
+            # 尝试解析JSON，递归查找B站链接
             try:
-                import json
-                json_data = json.loads(raw_json)
-                # 递归查找所有包含B站链接的字段
-                def _find_bili_urls(obj):
+                import json as _json
+                json_data = _json.loads(raw_json)
+                def _find_bili(obj):
                     if isinstance(obj, str):
                         if re.search(r'bilibili\.com/video/|b23\.tv/|BV[a-zA-Z0-9]{6,}', obj):
                             return obj
                     elif isinstance(obj, dict):
-                        for key in ("jumpUrl", "url", "targetUrl", "qqUrl", "sourceUrl"):
+                        for key in ("jumpUrl", "url", "targetUrl", "qqUrl", "sourceUrl", "qqdocurl"):
                             if key in obj:
-                                result = _find_bili_urls(obj[key])
-                                if result:
-                                    return result
+                                r = _find_bili(obj[key])
+                                if r:
+                                    return r
                         for v in obj.values():
-                            result = _find_bili_urls(v)
-                            if result:
-                                return result
+                            r = _find_bili(v)
+                            if r:
+                                return r
                     elif isinstance(obj, list):
                         for item in obj:
-                            result = _find_bili_urls(item)
-                            if result:
-                                return result
+                            r = _find_bili(item)
+                            if r:
+                                return r
                     return None
-                extra_url = _find_bili_urls(json_data)
-                if extra_url:
-                    full_text += " " + extra_url
-            except (json.JSONDecodeError, TypeError):
+                extra = _find_bili(json_data)
+                if extra:
+                    full_text += " " + extra
+            except (_json.JSONDecodeError, TypeError):
                 pass
 
-    # 检测B站链接或BV号（JSON中/会被转义为\/，需要先反转义）
+    # 反转义JSON中的\/
     full_text_unescaped = full_text.replace('\\/', '/')
-    if not re.search(r'bilibili\.com/video/|b23\.tv/|BV[a-zA-Z0-9]{6,}', full_text_unescaped):
+
+    # 提取BV号或b23短链接
+    bvid = _extract_bili_url(full_text_unescaped)
+    b23_id = _extract_b23_url(full_text_unescaped)
+
+    if not bvid and not b23_id:
         return
 
-    bvid = _extract_bili_url(full_text_unescaped)
+    client = _get_http_client()
+
+    # 如果是短链接，先解析
+    if not bvid and b23_id:
+        logger.info(f"[B站] 解析短链接: b23.tv/{b23_id}")
+        bvid = await _resolve_b23(client, b23_id)
+
     if not bvid:
         return
 
