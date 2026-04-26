@@ -81,6 +81,9 @@ def _save_accounting_seen():
     except Exception:
         pass
 
+# ---- 截图记账余额缓存 ----
+_accounting_balance = {}  # {user_id: latest_balance}
+
 
 def _get_client() -> OpenAI:
     """获取 OpenAI 客户端单例，如果连接失败则重新创建。"""
@@ -974,6 +977,11 @@ type规则：支出→"expense"，收入→"income"
                                                 seen_amounts.append(amt)
                                                 filtered.append(r)
                                             records = filtered
+
+                                        # 保存最新余额（取最大的余额值作为最新余额）
+                                        if balance_values:
+                                            latest_balance = max(balance_values)
+                                            _accounting_balance[uid] = latest_balance
 
                                         saved_count = 0
                                         for rec in records:

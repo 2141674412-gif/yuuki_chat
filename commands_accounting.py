@@ -13,7 +13,17 @@ from .commands_base import _register, _load_json, _save_json, _DATA_DIR
 _ACCOUNTING_FILE = os.path.join(_DATA_DIR, "accounting.json")
 # {user_id: [{"amount": float, "category": str, "note": str, "date": "YYYY-MM-DD HH:MM", "type": "expense/income"}]}
 
-# 分类关键词映射
+# 余额缓存（从chat.py截图记账写入）
+try:
+    from .chat import _accounting_balance
+except ImportError:
+    _accounting_balance = {}
+
+def _fmt_amount(amt):
+    """格式化金额：整数不显示小数，小数显示2位"""
+    if amt == int(amt):
+        return f"{int(amt)}"
+    return f"{amt:.2f}"
 _CATEGORY_MAP = {
     # 餐饮
     "吃": "餐饮", "喝": "餐饮", "饭": "餐饮", "奶茶": "餐饮", "咖啡": "餐饮",
@@ -142,7 +152,7 @@ async def _cmd_record(event: MessageEvent):
     _save_accounting(_accounting)
 
     icon = "📥" if record_type == "income" else "📤"
-    await record_cmd.finish(f"{icon} 已记录：{category} {note} {'+' if record_type=='income' else '-'}{amount:.0f}")
+    await record_cmd.finish(f"{icon} 已记录：{category} {note} {'+' if record_type=='income' else '-'}{_fmt_amount(amount)}")
 
 
 async def _cmd_bill(event: MessageEvent):
@@ -207,13 +217,13 @@ async def _cmd_bill(event: MessageEvent):
     if expense_by_cat:
         sorted_cats = sorted(expense_by_cat.items(), key=lambda x: x[1], reverse=True)
         for cat, amount in sorted_cats:
-            cat_lines.append(f"📤{cat}-{amount:.0f}")
+            cat_lines.append(f"📤{cat}-{_fmt_amount(amount)}")
 
     # 收入分类
     if income_by_cat:
         sorted_income = sorted(income_by_cat.items(), key=lambda x: x[1], reverse=True)
         for cat, amount in sorted_income:
-            cat_lines.append(f"📥{cat}+{amount:.0f}")
+            cat_lines.append(f"📥{cat}+{_fmt_amount(amount)}")
 
     net = income_total - expense_total
     if net >= 0:
@@ -228,6 +238,11 @@ async def _cmd_bill(event: MessageEvent):
         if i + 1 < len(cat_lines):
             row += "  " + cat_lines[i + 1]
         lines.append(row)
+
+    # 显示余额（来自截图记账提取）
+    balance = _accounting_balance.get(uid)
+    if balance is not None:
+        lines.append(f"💳 余额 {balance:.2f}")
 
     # 明细：只有带"明细"关键词才显示
     if "明细" in content or "详细" in content:
