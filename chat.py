@@ -877,16 +877,20 @@ async def handle_image_chat(event: MessageEvent):
                     classify_result = classify_resp.choices[0].message.content.strip()
                     if "是" in classify_result and "否" not in classify_result:
                         # 是支付截图，进入记账模式
-                        _accounting_prompt = """请仔细观察这张图片，这是一张支付/收款/银行短信截图。
-请逐条提取交易记录，每条记录包含原始文本。
+                        _accounting_prompt = """请仔细观察这张图片，这是一张银行短信通知截图。
+请逐条提取交易记录。
 
 回复格式：
-{"records": [{"amount": 金额数字, "category": "分类", "note": "商户名或描述", "type": "expense或income", "raw": "原始短信文本"}]}
+{"records": [{"amount": 金额数字, "category": "分类", "note": "商户名或描述", "type": "expense或income", "is_balance": true或false}]]
 
 分类规则：餐饮、交通、购物、娱乐、住房、学习、医疗、收入、其他
 type规则：支出→"expense"，收入→"income"
-规则：银行短信中"+"开头是收入，"-"开头是支出，忽略0.01元以下金额
-如果无法识别，回复：{"error": "无法识别"}"""
+
+关键规则：
+- 每条银行短信末尾的"余额XXX元"是账户余额，不是交易！标记is_balance=true
+- 交易金额前面通常有"+"或"-"号
+- 忽略0.01元以下金额
+- 如果无法识别，回复：{"error": "无法识别"}"""
 
                         user_content = []
                         for img_b64 in images_b64:
@@ -920,21 +924,23 @@ type规则：支出→"expense"，收入→"income"
                                             records = [data]
 
                                         # 后处理：过滤余额
-                                        # 1. 从raw文本中提取所有余额值
+                                        # 1. 用is_balance字段过滤（最可靠）
+                                        records = [r for r in records if not r.get("is_balance", False)]
+                                        # 2. 从raw文本中提取余额值（备用）
                                         balance_values = set()
                                         for r in records:
                                             raw = r.get("raw", "")
-                                            for m in re.finditer(r'余额[：:]?\s*([\d.]+)', raw):
-                                                try:
-                                                    balance_values.add(float(m.group(1)))
-                                                except ValueError:
-                                                    pass
-                                        # 2. 去掉amount等于某个余额值的记录
+                                            if raw:
+                                                for m in re.finditer(r'余额[：:]?\s*([\d.]+)', raw):
+                                                    try:
+                                                        balance_values.add(float(m.group(1)))
+                                                    except ValueError:
+                                                        pass
                                         if balance_values:
                                             records = [r for r in records if float(r.get("amount", 0)) not in balance_values]
                                         # 3. 去掉note/category含"余额"的记录
                                         records = [r for r in records if "余额" not in r.get("note", "") and "余额" not in r.get("category", "")]
-                                        # 4. 多条记录中去除重复金额（余额常与交易金额相同）
+                                        # 4. 多条记录中去除重复金额
                                         if len(records) > 1:
                                             seen_amounts = []
                                             filtered = []
