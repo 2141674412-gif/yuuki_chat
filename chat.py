@@ -687,7 +687,7 @@ async def handle_bilibili(event: MessageEvent):
             raw_json = seg.data.get("data", "")
             full_text += raw_json
             # 调试：打印完整JSON数据
-            logger.info(f"[B站] JSON卡片数据: {raw_json[:500]}")
+            logger.info(f"[B站] JSON卡片数据: {raw_json[:2000]}")
             # 尝试解析JSON，从jumpUrl等字段中提取B站链接
             try:
                 import json
