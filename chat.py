@@ -937,11 +937,13 @@ async def handle_image_chat(event: MessageEvent):
     plain = re.sub(r'\[CQ:[^\]]+\]', '', plain).strip()
 
     # 截图记账模式：有图片+提到"记/记账" 或 纯图片（无文字）不需要@bot
+    # 但如果被@了，强制走识图模式
+    _is_at_me = getattr(event, 'to_me', False)
     _has_accounting_keyword = any(kw in plain for kw in ["记", "记账", "记录"])
     _has_bot_mention = any(kw in plain for kw in ["希亚", "noa", "Noa", "结城", "正义的伙伴"])
     # 去掉可能的QQ昵称后检查文字长度
     _short_text = len(plain) <= 10
-    _accounting_mode = (_has_accounting_keyword or _short_text) and not _has_bot_mention
+    _accounting_mode = (_has_accounting_keyword or _short_text) and not _has_bot_mention and not _is_at_me
     logger.info(f"[图片理解] plain='{plain}', accounting={_accounting_mode}, keyword={_has_accounting_keyword}")
 
     # 群聊需要@bot或提到bot名字才触发，私聊直接触发
