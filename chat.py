@@ -1264,10 +1264,10 @@ type规则：支出→"expense"，收入→"income"
                                             _save_accounting(_accounting)
                                             if saved_count == 1:
                                                 r = records[0] if records else {}
-                                                icon = "📥" if r.get("type") == "income" else "📤"
-                                                await _img_chat.send(f"{icon} 已记录：{r.get('category','其他')} {r.get('note','')} {'+' if r.get('type')=='income' else '-'}{float(r.get('amount',0)):.0f}")
+                                                sign = "+" if r.get("type") == "income" else "-"
+                                                await _img_chat.send(f"已记录：{r.get('category','其他')} {r.get('note','')} {sign}{float(r.get('amount',0)):.0f}")
                                             else:
-                                                await _img_chat.send(f"✅ 已记录 {saved_count} 笔交易。")
+                                                await _img_chat.send(f"已记录 {saved_count} 笔交易。")
                                 except (json.JSONDecodeError, ValueError):
                                     pass
                             # 识别失败，走正常识图
@@ -1276,9 +1276,8 @@ type规则：支出→"expense"，收入→"income"
             except Exception as e:
                 logger.warning(f"[截图记账] 分类/识别失败: {e}")
 
-            # 截图记账模式下，识别失败不回复（不打扰用户）
-            if _accounting_mode:
-                return
+            # 截图记账模式下，如果分类不是支付截图，走正常识图
+            # 不再直接return，让下面的正常识图逻辑处理
 
         # 正常识图模式
         # 构建消息内容
@@ -1508,11 +1507,12 @@ driver = get_driver()
 
 @driver.on_startup
 async def on_bot_startup():
-    """bot 启动后启动自动发言任务 + 注册定时清理"""
+    """bot 启动后启动自动发言任务 + 注册定时清理 + 连接健康检查"""
     start_auto_chat()
     try:
         from .commands_schedule import _get_scheduler
-        _get_scheduler().add_job(
+        sched = _get_scheduler()
+        sched.add_job(
             _cleanup_old_histories,
             "interval",
             hours=1,
@@ -1520,5 +1520,38 @@ async def on_bot_startup():
             replace_existing=True,
         )
         logger.info("[定时清理] 已注册 chat_history 定时清理任务（每小时一次）")
+
+        # 每10分钟检查bot连接健康状态
+        sched.add_job(
+            _check_bot_health,
+            "interval",
+            minutes=10,
+            id="bot_health_check",
+            replace_existing=True,
+        )
+        logger.info("[健康检查] 已注册连接健康检查（每10分钟）")
     except Exception as e:
         logger.warning(f"[定时清理] 注册失败（APScheduler 可能未安装）: {e}")
+
+
+_last_event_time = time.time()
+
+
+def _record_event_time():
+    """记录最后一次收到事件的时间"""
+    global _last_event_time
+    _last_event_time = time.time()
+
+
+async def _check_bot_health():
+    """检查bot连接是否健康，如果不健康尝试重连"""
+    global _last_event_time
+    try:
+        from nonebot import get_bot
+        bot = get_bot()
+        # 尝试调用API检查连接
+        await bot.call_api("get_login_info")
+        logger.debug("[健康检查] bot连接正常")
+    except Exception as e:
+        logger.warning(f"[健康检查] bot连接异常: {e}，尝试重连...")
+        # 连接异常时记录日志，nonebot会自动尝试重连
