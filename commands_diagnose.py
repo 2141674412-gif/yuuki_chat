@@ -87,7 +87,7 @@ def _check_code_bugs():
                         bugs.append(f"⚠️ {fname} 第{i}行: f-string 中 '{var}' 可能未定义，需要用 '{{{var}}}' 转义")
 
         # 4. 检查 except Exception 是否遗漏 FinishedException
-        # 只检查同一个 try 块内调用了 .finish() 或 .send() 的情况
+        # 只检查同一个 try 块内调用了 .send() 或 .send() 的情况
         for i, line in enumerate(lines, 1):
             stripped = line.strip()
             if stripped.startswith("except Exception"):
@@ -102,10 +102,10 @@ def _check_code_bugs():
                 if try_line < 0:
                     continue
 
-                # 检查 try 块内（try: 到这个 except 之间）是否有 .finish() 或 .send()
+                # 检查 try 块内（try: 到这个 except 之间）是否有 .send() 或 .send()
                 has_finish = False
                 for j in range(try_line + 1, i):
-                    if ".finish(" in lines[j] or ".send(" in lines[j]:
+                    if ".send(" in lines[j] or ".send(" in lines[j]:
                         has_finish = True
                         break
                 if not has_finish:
@@ -132,7 +132,7 @@ def _check_code_bugs():
 
         # 6. 检查 _cmd_update_cmd.send / _cmd_update_cmd.finish（旧代码残留）
         for i, line in enumerate(lines, 1):
-            if "_cmd_update_cmd.send(" in line or "_cmd_update_cmd.finish(" in line:
+            if "_cmd_update_cmd.send(" in line or "_cmd_update_cmd.send(" in line:
                 bugs.append(f"❌ {fname} 第{i}行: 使用了旧的 _cmd_update_cmd.send/finish，应改用 bot 直接发送")
 
     return bugs
@@ -141,7 +141,7 @@ def _check_code_bugs():
 async def _cmd_diagnose(event: MessageEvent):
     """自检诊断：检查bot运行环境和常见问题"""
     if not check_superuser(str(event.user_id)):
-        await diagnose_cmd.finish("...你不是管理员。")
+        await diagnose_cmd.send("...你不是管理员。")
         return
 
     issues = []
@@ -319,7 +319,7 @@ async def _cmd_diagnose(event: MessageEvent):
         msg += f"AI {'✅' if ai_ok else '❌'} | "
         msg += f"天气 {'✅' if weather_ok else '❌'} | "
         msg += f"群 {group_info}"
-        await diagnose_cmd.finish(msg)
+        await diagnose_cmd.send(msg)
         return
 
     # 有问题，显示详细报告
@@ -453,11 +453,11 @@ async def _cmd_status(event: MessageEvent):
 
         status.append(f"群: {len(ALLOWED_GROUPS)}")
 
-        await status_cmd.finish("\n".join(status))
+        await status_cmd.send("\n".join(status))
     except FinishedException:
         raise
     except Exception as e:
-        await status_cmd.finish(f"状态检查失败: {e}")
+        await status_cmd.send(f"状态检查失败: {e}")
 
 
 status_cmd = _register("状态", _cmd_status, priority=1)

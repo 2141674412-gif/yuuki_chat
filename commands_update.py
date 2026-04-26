@@ -453,7 +453,7 @@ async def _cmd_update_status(event: MessageEvent):
     except Exception as e:
         lines.append(f"远程：查询失败（{type(e).__name__}）")
 
-    await _cmd_update_status_cmd.finish("\n".join(lines))
+    await _cmd_update_status_cmd.send("\n".join(lines))
 
 
 _cmd_update_cmd = _register("更新", _cmd_update, priority=1, admin_only=True)
@@ -472,11 +472,11 @@ async def _cmd_set_update_url(event: MessageEvent):
 
     if not content:
         url = _get_update_url()
-        await _cmd_set_update_url_cmd.finish(f"...当前更新地址：{url}\n用法：/设置更新地址 URL")
+        await _cmd_set_update_url_cmd.send(f"...当前更新地址：{url}\n用法：/设置更新地址 URL")
         return
 
     _set_update_url(content)
-    await _cmd_set_update_url_cmd.finish(f"...已设置更新地址：{content}")
+    await _cmd_set_update_url_cmd.send(f"...已设置更新地址：{content}")
 
 
 async def _cmd_start_file_server(event: MessageEvent):
@@ -490,7 +490,7 @@ async def _cmd_start_file_server(event: MessageEvent):
         result = s.connect_ex(("127.0.0.1", port))
         s.close()
         if result == 0:
-            await _cmd_start_file_server_cmd.finish(
+            await _cmd_start_file_server_cmd.send(
                 f"...文件服务器已在运行：http://127.0.0.1:{port}\n"
                 f"把 yuuki_chat.zip 放到 {server_dir} 目录下即可。")
             return
@@ -574,7 +574,7 @@ async def _cmd_changelog(event: MessageEvent):
     """查看更新日志"""
     _load_changelog()
     if not _CHANGELOG:
-        await _cmd_changelog_cmd.finish("...还没有更新记录。")
+        await _cmd_changelog_cmd.send("...还没有更新记录。")
         return
 
     msg = str(event.message).strip()
@@ -612,7 +612,7 @@ async def _cmd_changelog(event: MessageEvent):
         else:
             lines.append(f"已是最后一页，查看之前：/更新日志 {page - 1}")
 
-    await _cmd_changelog_cmd.finish("\n".join(lines))
+    await _cmd_changelog_cmd.send("\n".join(lines))
 
 
 async def _cmd_add_changelog(event: MessageEvent):
@@ -624,11 +624,11 @@ async def _cmd_add_changelog(event: MessageEvent):
             break
 
     if not content:
-        await _cmd_add_changelog_cmd.finish("...记什么？用法：/记录更新 内容")
+        await _cmd_add_changelog_cmd.send("...记什么？用法：/记录更新 内容")
         return
 
     _append_changelog(f"v{_get_current_version()}", content, str(event.user_id))
-    await _cmd_add_changelog_cmd.finish(f"...已记录。当前第 {len(_CHANGELOG)} 代。")
+    await _cmd_add_changelog_cmd.send(f"...已记录。当前第 {len(_CHANGELOG)} 代。")
 
 
 _cmd_changelog_cmd = _register("更新日志", _cmd_changelog, aliases=["changelog"])

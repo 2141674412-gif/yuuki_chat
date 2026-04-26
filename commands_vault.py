@@ -175,7 +175,7 @@ def _parse_vault_args(user_id: str, content: str) -> tuple:
 async def _cmd_vault_setpw(event: MessageEvent):
     """设置保险箱密码：/设置密码 xxx"""
     if hasattr(event, 'group_id') and event.group_id:
-        await vault_setpw_cmd.finish("...这个只能私聊用。")
+        await vault_setpw_cmd.send("...这个只能私聊用。")
         return
     content = str(event.message).strip()
     for prefix in ["设置密码", "设密码"]:
@@ -183,27 +183,27 @@ async def _cmd_vault_setpw(event: MessageEvent):
             content = content[len(prefix):].strip()
             break
     if not content:
-        await vault_setpw_cmd.finish("...密码呢。格式：/设置密码 你的密码")
+        await vault_setpw_cmd.send("...密码呢。格式：/设置密码 你的密码")
         return
     if len(content) < 4:
-        await vault_setpw_cmd.finish("...密码太短了，至少4位。")
+        await vault_setpw_cmd.send("...密码太短了，至少4位。")
         return
     user_id = str(event.user_id)
     vault = _load_vault()
     if user_id not in vault:
         vault[user_id] = {}
     if vault[user_id].get("_password_hash"):
-        await vault_setpw_cmd.finish("你已经设置过密码了。如需修改请先 /修改密码")
+        await vault_setpw_cmd.send("你已经设置过密码了。如需修改请先 /修改密码")
         return
     vault[user_id]["_password_hash"] = _hash_password(content)
     _save_vault(vault)
-    await vault_setpw_cmd.finish("[OK] 保险箱密码设置成功。\n现在可以用 /存 /取 /删密 了。\n格式：/存 密码名|密码 内容")
+    await vault_setpw_cmd.send("[OK] 保险箱密码设置成功。\n现在可以用 /存 /取 /删密 了。\n格式：/存 密码名|密码 内容")
 
 
 async def _cmd_vault_setkey(event: MessageEvent):
     """设置保险箱自定义密钥：/设置密钥 我的密码"""
     if hasattr(event, 'group_id') and event.group_id:
-        await vault_setkey_cmd.finish("...这个只能私聊用。")
+        await vault_setkey_cmd.send("...这个只能私聊用。")
         return
     content = str(event.message).strip()
     for prefix in ["设置密钥", "设密钥"]:
@@ -211,30 +211,30 @@ async def _cmd_vault_setkey(event: MessageEvent):
             content = content[len(prefix):].strip()
             break
     if not content:
-        await vault_setkey_cmd.finish("...密钥呢。格式：/设置密钥 你的密钥")
+        await vault_setkey_cmd.send("...密钥呢。格式：/设置密钥 你的密钥")
         return
     if len(content) < 4:
-        await vault_setkey_cmd.finish("...密钥太短了，至少4位。")
+        await vault_setkey_cmd.send("...密钥太短了，至少4位。")
         return
     user_id = str(event.user_id)
     # 验证旧密钥（第一次设置用默认密码验证）
     existing_key = _get_user_custom_key(user_id)
     if existing_key is not None:
         # 已有自定义密钥，需要验证旧密钥
-        await vault_setkey_cmd.finish("你已经设置过密钥了。如需更换，请先 /删除密钥 后重新设置。")
+        await vault_setkey_cmd.send("你已经设置过密钥了。如需更换，请先 /删除密钥 后重新设置。")
         return
     # 第一次设置，需要验证默认密码
     if _get_user_password(user_id) is None:
-        await vault_setkey_cmd.finish("请先设置保险箱密码：/设置密码 你的密码")
+        await vault_setkey_cmd.send("请先设置保险箱密码：/设置密码 你的密码")
         return
     _set_user_custom_key(user_id, content)
-    await vault_setkey_cmd.finish("[OK] 自定义密钥设置成功。\n以后存/取/删密时会自动使用此密钥，无需每次输入。")
+    await vault_setkey_cmd.send("[OK] 自定义密钥设置成功。\n以后存/取/删密时会自动使用此密钥，无需每次输入。")
 
 
 async def _cmd_vault_changepw(event: MessageEvent):
     """修改保险箱密码：/修改密码 旧密码 新密码"""
     if hasattr(event, 'group_id') and event.group_id:
-        await vault_changepw_cmd.finish("...这个只能私聊用。")
+        await vault_changepw_cmd.send("...这个只能私聊用。")
         return
     content = str(event.message).strip()
     for prefix in ["修改密码", "改密码"]:
@@ -242,24 +242,24 @@ async def _cmd_vault_changepw(event: MessageEvent):
             content = content[len(prefix):].strip()
             break
     if not content:
-        await vault_changepw_cmd.finish("...格式：/修改密码 旧密码 新密码")
+        await vault_changepw_cmd.send("...格式：/修改密码 旧密码 新密码")
         return
     parts = content.split(None, 1)
     if len(parts) < 2:
-        await vault_changepw_cmd.finish("...格式：/修改密码 旧密码 新密码")
+        await vault_changepw_cmd.send("...格式：/修改密码 旧密码 新密码")
         return
     old_pw, new_pw = parts[0], parts[1]
     if len(new_pw) < 4:
-        await vault_changepw_cmd.finish("...新密码太短了，至少4位。")
+        await vault_changepw_cmd.send("...新密码太短了，至少4位。")
         return
     user_id = str(event.user_id)
     # 如果设置了自定义密钥，不允许直接修改密码（会导致数据锁死）
     if _get_user_custom_key(user_id) is not None:
-        await vault_changepw_cmd.finish("...你设置了自定义密钥，无法直接修改密码。\n请先删除密钥：/设置密钥（不推荐），或联系管理员。")
+        await vault_changepw_cmd.send("...你设置了自定义密钥，无法直接修改密码。\n请先删除密钥：/设置密钥（不推荐），或联系管理员。")
         return
     ok, err = _require_password(user_id, old_pw)
     if not ok:
-        await vault_changepw_cmd.finish(err)
+        await vault_changepw_cmd.send(err)
         return
     # 用新密码重新加密所有条目
     vault = _load_vault()
@@ -276,13 +276,13 @@ async def _cmd_vault_changepw(event: MessageEvent):
     user_data["_password_hash"] = _hash_password(new_pw)
     vault[user_id] = user_data
     _save_vault(vault)
-    await vault_changepw_cmd.finish("[OK] 密码修改成功，所有数据已重新加密。")
+    await vault_changepw_cmd.send("[OK] 密码修改成功，所有数据已重新加密。")
 
 
 async def _cmd_vault_save(event: MessageEvent):
     """存密码：/存 密码名|密码 内容 或 /存 密码名 内容（使用自定义密钥）"""
     if hasattr(event, 'group_id') and event.group_id:
-        await vault_save_cmd.finish("...这个只能私聊用。")
+        await vault_save_cmd.send("...这个只能私聊用。")
         return
     content = str(event.message).strip()
     for prefix in ["存密码", "存密"]:
@@ -292,12 +292,12 @@ async def _cmd_vault_save(event: MessageEvent):
     if content.startswith("存"):
         content = content[1:].strip()
     if not content:
-        await vault_save_cmd.finish("...格式：/存 密码名|密码 内容\n或：/存 密码名 内容（需先设置密钥）")
+        await vault_save_cmd.send("...格式：/存 密码名|密码 内容\n或：/存 密码名 内容（需先设置密钥）")
         return
     user_id = str(event.user_id)
     name, pw, err = _parse_vault_args(user_id, content)
     if err:
-        await vault_save_cmd.finish(err)
+        await vault_save_cmd.send(err)
         return
     # 提取要保存的内容（去掉名称和密码部分）
     pipe_idx = content.find("|")
@@ -309,24 +309,24 @@ async def _cmd_vault_save(event: MessageEvent):
         pw_len = len(after_pipe.split(None, 1)[0]) if after_pipe else 0
         value_part = after_pipe[pw_len:].strip() if after_pipe else ""
     if not name or not value_part:
-        await vault_save_cmd.finish("...格式不对。/存 密码名|密码 内容")
+        await vault_save_cmd.send("...格式不对。/存 密码名|密码 内容")
         return
     ok, err = _require_password(user_id, pw)
     if not ok:
-        await vault_save_cmd.finish(err)
+        await vault_save_cmd.send(err)
         return
     vault = _load_vault()
     if user_id not in vault:
         vault[user_id] = {}
     vault[user_id][name] = _encrypt(value_part, pw)
     _save_vault(vault)
-    await vault_save_cmd.finish(f"已保存「{name}」。")
+    await vault_save_cmd.send(f"已保存「{name}」。")
 
 
 async def _cmd_vault_get(event: MessageEvent):
     """取密码：/取 密码名|密码 或 /取 密码名（使用自定义密钥）"""
     if hasattr(event, 'group_id') and event.group_id:
-        await vault_get_cmd.finish("...这个只能私聊用。")
+        await vault_get_cmd.send("...这个只能私聊用。")
         return
     content = str(event.message).strip()
     for prefix in ["取密码", "取密"]:
@@ -336,37 +336,37 @@ async def _cmd_vault_get(event: MessageEvent):
     if content.startswith("取"):
         content = content[1:].strip()
     if not content:
-        await vault_get_cmd.finish("...格式：/取 密码名|密码\n或：/取 密码名（需先设置密钥）")
+        await vault_get_cmd.send("...格式：/取 密码名|密码\n或：/取 密码名（需先设置密钥）")
         return
     user_id = str(event.user_id)
     name, pw, err = _parse_vault_args(user_id, content)
     if err:
-        await vault_get_cmd.finish(err)
+        await vault_get_cmd.send(err)
         return
     if not name:
-        await vault_get_cmd.finish("...格式不对。/取 密码名|密码")
+        await vault_get_cmd.send("...格式不对。/取 密码名|密码")
         return
     ok, err = _require_password(user_id, pw)
     if not ok:
-        await vault_get_cmd.finish(err)
+        await vault_get_cmd.send(err)
         return
     vault = _load_vault()
     user_data = vault.get(user_id, {})
     encrypted = user_data.get(name)
     if not encrypted:
-        await vault_get_cmd.finish(f"没有叫「{name}」的记录。")
+        await vault_get_cmd.send(f"没有叫「{name}」的记录。")
         return
     value = _decrypt(encrypted, pw)
     if value is None:
-        await vault_get_cmd.finish("解密失败，可能是密码不对或数据损坏。")
+        await vault_get_cmd.send("解密失败，可能是密码不对或数据损坏。")
         return
-    await vault_get_cmd.finish(f"【{name}】\n{value}")
+    await vault_get_cmd.send(f"【{name}】\n{value}")
 
 
 async def _cmd_vault_delete(event: MessageEvent):
     """删密码：/删密 密码名|密码 或 /删密 密码名（使用自定义密钥）"""
     if hasattr(event, 'group_id') and event.group_id:
-        await vault_del_cmd.finish("...这个只能私聊用。")
+        await vault_del_cmd.send("...这个只能私聊用。")
         return
     content = str(event.message).strip()
     for prefix in ["删密码", "删除密码"]:
@@ -376,36 +376,36 @@ async def _cmd_vault_delete(event: MessageEvent):
     if content.startswith("删密"):
         content = content[3:].strip()
     if not content:
-        await vault_del_cmd.finish("...格式：/删密 密码名|密码\n或：/删密 密码名（需先设置密钥）")
+        await vault_del_cmd.send("...格式：/删密 密码名|密码\n或：/删密 密码名（需先设置密钥）")
         return
     user_id = str(event.user_id)
     name, pw, err = _parse_vault_args(user_id, content)
     if err:
-        await vault_del_cmd.finish(err)
+        await vault_del_cmd.send(err)
         return
     if not name:
-        await vault_del_cmd.finish("...格式不对。/删密 密码名|密码")
+        await vault_del_cmd.send("...格式不对。/删密 密码名|密码")
         return
     ok, err = _require_password(user_id, pw)
     if not ok:
-        await vault_del_cmd.finish(err)
+        await vault_del_cmd.send(err)
         return
     vault = _load_vault()
     user_data = vault.get(user_id, {})
     if name not in user_data:
-        await vault_del_cmd.finish(f"没有叫「{name}」的记录。")
+        await vault_del_cmd.send(f"没有叫「{name}」的记录。")
         return
     del vault[user_id][name]
     if not vault[user_id]:
         del vault[user_id]
     _save_vault(vault)
-    await vault_del_cmd.finish(f"已删除「{name}」。")
+    await vault_del_cmd.send(f"已删除「{name}」。")
 
 
 async def _cmd_vault_list(event: MessageEvent):
     """密码列表：/密码列表 密码 或 /密码列表（使用自定义密钥）"""
     if hasattr(event, 'group_id') and event.group_id:
-        await vault_list_cmd.finish("...这个只能私聊用。")
+        await vault_list_cmd.send("...这个只能私聊用。")
         return
     content = str(event.message).strip()
     for prefix in ["密码列表"]:
@@ -419,24 +419,24 @@ async def _cmd_vault_list(event: MessageEvent):
         if custom_key:
             pw = custom_key
         else:
-            await vault_list_cmd.finish("...格式：/密码列表 你的密码\n或先 /设置密钥 设置自定义密钥")
+            await vault_list_cmd.send("...格式：/密码列表 你的密码\n或先 /设置密钥 设置自定义密钥")
             return
     else:
         pw = _resolve_vault_password(user_id, content.strip())
     ok, err = _require_password(user_id, pw)
     if not ok:
-        await vault_list_cmd.finish(err)
+        await vault_list_cmd.send(err)
         return
     vault = _load_vault()
     user_data = vault.get(user_id, {})
     items = {k: v for k, v in user_data.items() if not k.startswith("_")}
     if not items:
-        await vault_list_cmd.finish("你还没有存过任何密码。")
+        await vault_list_cmd.send("你还没有存过任何密码。")
         return
     msg = "你的密码列表：\n"
     for i, name in enumerate(items.keys(), 1):
         msg += f"{i}. {name}\n"
-    await vault_list_cmd.finish(msg.strip())
+    await vault_list_cmd.send(msg.strip())
 
 
 vault_setpw_cmd = _register("设置密码", _cmd_vault_setpw, priority=1)

@@ -38,7 +38,7 @@ async def _cmd_schedule(event: MessageEvent):
     if not isinstance(event, MessageEvent):
         from nonebot.adapters.onebot.v11 import GroupMessageEvent
         if not isinstance(event, GroupMessageEvent):
-            await schedule_cmd.finish("...这个命令只能在群里用哦。")
+            await schedule_cmd.send("...这个命令只能在群里用哦。")
             return
     content = str(event.message).strip()
     for prefix in ["定时"]:
@@ -46,7 +46,7 @@ async def _cmd_schedule(event: MessageEvent):
             content = content[len(prefix):].strip()
             break
     if not content:
-        await schedule_cmd.finish(
+        await schedule_cmd.send(
             "...用法：/定时 08:00 早安\n"
             "或：/定时 每天 08:00 早安\n"
             "或：/定时 30m 喝水（一次性定时）"
@@ -61,15 +61,15 @@ async def _cmd_schedule(event: MessageEvent):
         delay_str = onetime_match.group(1)
         task_content = onetime_match.group(2).strip()
         if not task_content:
-            await schedule_cmd.finish("...格式不对哦。用法：/定时 30m 喝水")
+            await schedule_cmd.send("...格式不对哦。用法：/定时 30m 喝水")
             return
         # 解析延迟时间
         delay_seconds = _parse_delay(delay_str)
         if delay_seconds is None:
-            await schedule_cmd.finish("...延迟格式不对，支持如 30s, 30m, 2h, 1d。")
+            await schedule_cmd.send("...延迟格式不对，支持如 30s, 30m, 2h, 1d。")
             return
         if delay_seconds < 1:
-            await schedule_cmd.finish("...延迟时间太短了。")
+            await schedule_cmd.send("...延迟时间太短了。")
             return
         run_date = datetime.now() + timedelta(seconds=delay_seconds)
         key = f"{group_id}:once:{run_date.isoformat()}"
@@ -93,7 +93,7 @@ async def _cmd_schedule(event: MessageEvent):
         except Exception as e:
             logger.error(f"[定时] APScheduler 注册失败: {e}")
         delay_display = _format_delay(delay_seconds)
-        await schedule_cmd.finish(
+        await schedule_cmd.send(
             f"已设置一次性定时：{delay_display}后发送「{task_content}」"
         )
         return
@@ -109,7 +109,7 @@ async def _cmd_schedule(event: MessageEvent):
         time_str = m.group(1)
         task_content = m.group(2).strip()
     if not time_str or not task_content:
-        await schedule_cmd.finish("...格式不对哦。用法：/定时 08:00 早安")
+        await schedule_cmd.send("...格式不对哦。用法：/定时 08:00 早安")
         return
     # 验证时间格式
     try:
@@ -118,7 +118,7 @@ async def _cmd_schedule(event: MessageEvent):
         if not (0 <= h <= 23 and 0 <= mi <= 59):
             raise ValueError
     except (ValueError, AttributeError):
-        await schedule_cmd.finish("...时间格式不对，请用 HH:MM 格式。")
+        await schedule_cmd.send("...时间格式不对，请用 HH:MM 格式。")
         return
     key = f"{group_id}:{time_str}"
     _scheduled_tasks[key] = {"content": task_content, "enabled": True, "type": "daily"}
@@ -136,7 +136,7 @@ async def _cmd_schedule(event: MessageEvent):
         )
     except Exception as e:
         logger.error(f"[定时] APScheduler 注册失败: {e}")
-    await schedule_cmd.finish(f"已设置定时任务：每天 {time_str} 发送「{task_content}」")
+    await schedule_cmd.send(f"已设置定时任务：每天 {time_str} 发送「{task_content}」")
 
 
 def _parse_delay(delay_str: str):
@@ -189,7 +189,7 @@ async def _cmd_schedule_list(event: MessageEvent):
     """查看定时任务列表"""
     group_id = str(getattr(event, 'group_id', 0))
     if not group_id or group_id == "0":
-        await schedule_list_cmd.finish("...这个命令只能在群里用哦。")
+        await schedule_list_cmd.send("...这个命令只能在群里用哦。")
         return
     tasks = []
     now = datetime.now()
@@ -222,17 +222,17 @@ async def _cmd_schedule_list(event: MessageEvent):
     if expired_keys:
         _save_scheduled_tasks()
     if not tasks:
-        await schedule_list_cmd.finish("...当前群没有定时任务。")
+        await schedule_list_cmd.send("...当前群没有定时任务。")
         return
     lines = ["【定时任务列表】"] + tasks
     lines.append(f"\n共 {len(tasks)} 个任务")
-    await schedule_list_cmd.finish("\n".join(lines))
+    await schedule_list_cmd.send("\n".join(lines))
 
 async def _cmd_cancel_schedule(event: MessageEvent):
     """取消定时任务：/取消定时 时间"""
     group_id = str(getattr(event, 'group_id', 0))
     if not group_id or group_id == "0":
-        await cancel_schedule_cmd.finish("...这个命令只能在群里用哦。")
+        await cancel_schedule_cmd.send("...这个命令只能在群里用哦。")
         return
     content = str(event.message).strip()
     for prefix in ["取消定时"]:
@@ -240,7 +240,7 @@ async def _cmd_cancel_schedule(event: MessageEvent):
             content = content[len(prefix):].strip()
             break
     if not content:
-        await cancel_schedule_cmd.finish("...用法：/取消定时 08:00")
+        await cancel_schedule_cmd.send("...用法：/取消定时 08:00")
         return
     key = f"{group_id}:{content}"
     if key in _scheduled_tasks:
@@ -250,9 +250,9 @@ async def _cmd_cancel_schedule(event: MessageEvent):
             _get_scheduler().remove_job(f"sched_{key}")
         except Exception:
             pass
-        await cancel_schedule_cmd.finish(f"已取消 {content} 的定时任务。")
+        await cancel_schedule_cmd.send(f"已取消 {content} 的定时任务。")
     else:
-        await cancel_schedule_cmd.finish(f"...没有找到 {content} 的定时任务。")
+        await cancel_schedule_cmd.send(f"...没有找到 {content} 的定时任务。")
 
 schedule_cmd = _register("定时", _cmd_schedule)
 schedule_list_cmd = _register("定时列表", _cmd_schedule_list)
@@ -355,10 +355,10 @@ async def _cmd_set_alert(event: MessageEvent):
     """设置告警：/设置告警 开/关"""
     from nonebot.adapters.onebot.v11 import GroupMessageEvent
     if not isinstance(event, GroupMessageEvent):
-        await set_alert_cmd.finish("...这个命令只能在群里用哦。")
+        await set_alert_cmd.send("...这个命令只能在群里用哦。")
         return
     if not check_superuser(str(event.user_id)):
-        await set_alert_cmd.finish("...你不是管理员。")
+        await set_alert_cmd.send("...你不是管理员。")
         return
     content = str(event.message).strip()
     for prefix in ["设置告警"]:
@@ -369,14 +369,14 @@ async def _cmd_set_alert(event: MessageEvent):
         group_id = str(event.group_id)
         _alert_config[group_id] = {"enabled": True}
         _save_alert_config()
-        await set_alert_cmd.finish("已开启掉线告警~")
+        await set_alert_cmd.send("已开启掉线告警~")
     elif content in ("关", "关闭", "off", "0", "false"):
         group_id = str(event.group_id)
         _alert_config[group_id] = {"enabled": False}
         _save_alert_config()
-        await set_alert_cmd.finish("已关闭掉线告警。")
+        await set_alert_cmd.send("已关闭掉线告警。")
     else:
-        await set_alert_cmd.finish("...用法：/设置告警 开 或 /设置告警 关")
+        await set_alert_cmd.send("...用法：/设置告警 开 或 /设置告警 关")
 
 set_alert_cmd = _register("设置告警", _cmd_set_alert)
 

@@ -38,7 +38,7 @@ async def _cmd_checkin(event: MessageEvent):
         user_points[user_id] = 0
 
     if checkin_records[user_id]["last_date"] == today:
-        await checkin_cmd.finish("你今天已经签过了。别想骗我。")
+        await checkin_cmd.send("你今天已经签过了。别想骗我。")
         return
 
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -81,7 +81,7 @@ async def _cmd_checkin(event: MessageEvent):
     elif streak >= 7:
         streak_msg += " 还挺坚持的嘛。"
 
-    await checkin_cmd.finish(
+    await checkin_cmd.send(
         f"签到成功。+{total}积分{bonus_desc}\n"
         f"当前积分：{user_points[user_id]}\n"
         f"今日运势：{luck} - {luck_msg[luck]}{streak_msg}"
@@ -108,9 +108,9 @@ async def _cmd_points(event: MessageEvent):
         streak = checkin_records[target_id].get("streak", 0)
 
     if target_id == user_id:
-        await points_cmd.finish(f"你的积分：{points}\n连续签到：{streak}天")
+        await points_cmd.send(f"你的积分：{points}\n连续签到：{streak}天")
     else:
-        await points_cmd.finish(f"Ta的积分：{points}\n连续签到：{streak}天")
+        await points_cmd.send(f"Ta的积分：{points}\n连续签到：{streak}天")
 
 points_cmd = _register("积分", _cmd_points, aliases=["我的积分", "查积分"])
 
@@ -119,7 +119,7 @@ points_cmd = _register("积分", _cmd_points, aliases=["我的积分", "查积�
 async def _cmd_ranking(event: MessageEvent):
     """积分排行榜：/排行"""
     if not user_points:
-        await ranking_cmd.finish("还没有人签到过。")
+        await ranking_cmd.send("还没有人签到过。")
         return
 
     sorted_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -129,6 +129,6 @@ async def _cmd_ranking(event: MessageEvent):
         medal = ["1st", "2nd", "3rd"][i-1] if i <= 3 else f"{i}th"
         msg += f"{medal} {pts}分 ({_mask_qq(uid)}) (连签{streak}天)\n"
 
-    await ranking_cmd.finish(msg.strip())
+    await ranking_cmd.send(msg.strip())
 
 ranking_cmd = _register("排行", _cmd_ranking, aliases=["排行榜", "排名"])

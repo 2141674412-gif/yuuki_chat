@@ -85,7 +85,7 @@ async def _cmd_translate(event: MessageEvent):
     content = str(event.message).replace("翻译", "", 1).strip().lstrip("/").strip()
 
     if not content:
-        await translate_cmd.finish("翻译什么。说清楚。格式：/翻译 内容\n或 /翻译 en 内容")
+        await translate_cmd.send("翻译什么。说清楚。格式：/翻译 内容\n或 /翻译 en 内容")
 
     target_lang = "en"
     text_to_translate = content
@@ -105,7 +105,7 @@ async def _cmd_translate(event: MessageEvent):
     if _cache_key in _translate_cache:
         _cached = _translate_cache[_cache_key]
         if time.time() - _cached["time"] < _TRANSLATE_TTL:
-            await translate_cmd.finish(f"{text_to_translate}\n→ {_cached['result']}（缓存）")
+            await translate_cmd.send(f"{text_to_translate}\n→ {_cached['result']}（缓存）")
 
     apis = [_translate_api1, _translate_api2, _translate_api3]
 
@@ -143,7 +143,7 @@ async def _cmd_translate(event: MessageEvent):
                 for p in pending:
                     p.cancel()
                 _save_to_cache(result)
-                await translate_cmd.finish(f"{text_to_translate}\n→ {result}")
+                await translate_cmd.send(f"{text_to_translate}\n→ {result}")
         # 第一个完成的没有结果，等待剩余任务
         if pending:
             done2, pending2 = await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
@@ -151,15 +151,15 @@ async def _cmd_translate(event: MessageEvent):
                 result = t.result()
                 if result:
                     _save_to_cache(result)
-                    await translate_cmd.finish(f"{text_to_translate}\n→ {result}")
+                    await translate_cmd.send(f"{text_to_translate}\n→ {result}")
     except FinishedException:
         raise
     except Exception as e:
         logger.debug(f"[翻译] {e}")
 
     if _timeout_hit:
-        await translate_cmd.finish("...翻译超时了，稍后再试。")
+        await translate_cmd.send("...翻译超时了，稍后再试。")
     else:
-        await translate_cmd.finish("...翻译服务都连不上了。检查一下网络。")
+        await translate_cmd.send("...翻译服务都连不上了。检查一下网络。")
 
 translate_cmd = _register("翻译", _cmd_translate)

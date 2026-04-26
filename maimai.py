@@ -906,7 +906,7 @@ async def handle_mai(event: MessageEvent):
     if content.startswith("歌曲") or content.lower().startswith("song"):
         song_name = content[2:].strip() if content.startswith("歌曲") else content[4:].strip()
         if not song_name:
-            await mai_cmd.finish("...歌名呢。格式：/mai 歌曲 歌名")
+            await mai_cmd.send("...歌名呢。格式：/mai 歌曲 歌名")
             return
         try:
             # 并行获取歌曲数据和用户绑定信息
@@ -949,7 +949,7 @@ async def handle_mai(event: MessageEvent):
             player_data = results[1] if not isinstance(results[1], Exception) else None
 
             if not music_data:
-                await mai_cmd.finish("...获取歌曲数据失败了。稍后再试。")
+                await mai_cmd.send("...获取歌曲数据失败了。稍后再试。")
                 return
 
             # 搜索匹配的歌曲
@@ -966,7 +966,7 @@ async def handle_mai(event: MessageEvent):
                         break
 
             if not matched:
-                await mai_cmd.finish(f"找不到叫「{song_name}」的歌。检查一下歌名？")
+                await mai_cmd.send(f"找不到叫「{song_name}」的歌。检查一下歌名？")
                 return
 
             # 从已获取的玩家数据中查找对应歌曲成绩
@@ -983,35 +983,35 @@ async def handle_mai(event: MessageEvent):
             buf = io.BytesIO()
             song_img.save(buf, format="PNG")
             buf.seek(0)
-            await mai_cmd.finish(MessageSegment.image(buf))
+            await mai_cmd.send(MessageSegment.image(buf))
 
         except FinishedException:
             raise
         except httpx.TimeoutException:
-            await mai_cmd.finish("...水鱼API超时了，网络可能不太稳定，稍后再试吧。")
+            await mai_cmd.send("...水鱼API超时了，网络可能不太稳定，稍后再试吧。")
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
             if status == 429:
-                await mai_cmd.finish("...请求太频繁了，水鱼限制了访问。等一会儿再试。")
+                await mai_cmd.send("...请求太频繁了，水鱼限制了访问。等一会儿再试。")
             elif status >= 500:
-                await mai_cmd.finish(f"...水鱼服务器好像挂了（HTTP {status}）。过会儿再试。")
+                await mai_cmd.send(f"...水鱼服务器好像挂了（HTTP {status}）。过会儿再试。")
             else:
-                await mai_cmd.finish(f"...请求出错了（HTTP {status}）。稍后再试。")
+                await mai_cmd.send(f"...请求出错了（HTTP {status}）。稍后再试。")
         except httpx.ConnectError:
-            await mai_cmd.finish("...连不上水鱼服务器。检查一下网络？")
+            await mai_cmd.send("...连不上水鱼服务器。检查一下网络？")
         except Exception as e:
             logger.error(f"[单曲查询] 出错: {e}")
-            await mai_cmd.finish("查询出错了，稍后再试吧。")
+            await mai_cmd.send("查询出错了，稍后再试吧。")
         return
 
     # /mai 绑定 用户名 → 改为提示用新命令
     if content.startswith("绑定"):
-        await mai_cmd.finish("...绑定命令已更新：\n/绑定 好友码 — 绑定好友码（查牌子用）\n/绑定水鱼 用户名 — 绑定水鱼账号（查B50用）")
+        await mai_cmd.send("...绑定命令已更新：\n/绑定 好友码 — 绑定好友码（查牌子用）\n/绑定水鱼 用户名 — 绑定水鱼账号（查B50用）")
         return
 
     # /mai 解绑 → 提示用新命令
     if content == "解绑":
-        await mai_cmd.finish("...请直接发 /解绑")
+        await mai_cmd.send("...请直接发 /解绑")
         return
 
     # /mai b50 用户名 或 /mai b40 用户名
@@ -1048,7 +1048,7 @@ async def handle_mai(event: MessageEvent):
             body_key = "username"
             username = df_username
         else:
-            await mai_cmd.finish("...还没绑定。格式：/mai b50 用户名\n或 /绑定水鱼 用户名 /绑定token token")
+            await mai_cmd.send("...还没绑定。格式：/mai b50 用户名\n或 /绑定水鱼 用户名 /绑定token token")
             return
     else:
         body_key = "username"
@@ -1118,7 +1118,7 @@ async def handle_mai(event: MessageEvent):
 
         if "error" in data and "charts" not in data:
             err_msg = data.get("error", data.get("message", "未知错误"))
-            await mai_cmd.finish(f"查不到这个人。{err_msg}")
+            await mai_cmd.send(f"查不到这个人。{err_msg}")
             return
 
         # 生成图片（异步，因为要下载封面）
@@ -1129,7 +1129,7 @@ async def handle_mai(event: MessageEvent):
         img = await generate_mai_image(data, is_b50)
 
         if img is None:
-            await mai_cmd.finish("没有成绩数据。")
+            await mai_cmd.send("没有成绩数据。")
             return
 
         # 保存到内存并发送
@@ -1137,25 +1137,25 @@ async def handle_mai(event: MessageEvent):
         img.save(buf, format="PNG")
         buf.seek(0)
 
-        await mai_cmd.finish(MessageSegment.image(buf))
+        await mai_cmd.send(MessageSegment.image(buf))
 
     except httpx.TimeoutException:
-        await mai_cmd.finish("...水鱼API超时了，网络可能不太稳定，稍后再试吧。")
+        await mai_cmd.send("...水鱼API超时了，网络可能不太稳定，稍后再试吧。")
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
         if status == 429:
-            await mai_cmd.finish("...请求太频繁了，水鱼限制了访问。等一会儿再试。")
+            await mai_cmd.send("...请求太频繁了，水鱼限制了访问。等一会儿再试。")
         elif status >= 500:
-            await mai_cmd.finish(f"...水鱼服务器好像挂了（HTTP {status}）。过会儿再试。")
+            await mai_cmd.send(f"...水鱼服务器好像挂了（HTTP {status}）。过会儿再试。")
         else:
-            await mai_cmd.finish(f"...请求出错了（HTTP {status}）。稍后再试。")
+            await mai_cmd.send(f"...请求出错了（HTTP {status}）。稍后再试。")
     except httpx.ConnectError:
-        await mai_cmd.finish("...连不上水鱼服务器。检查一下网络？")
+        await mai_cmd.send("...连不上水鱼服务器。检查一下网络？")
     except FinishedException:
         raise
     except Exception as e:
         logger.error(f"[B50查询] 出错: {e}")
-        await mai_cmd.finish("查询出错了，稍后再试吧。")
+        await mai_cmd.send("查询出错了，稍后再试吧。")
 
 
 # ========== 绑定系统（好友码 + 水鱼用户名） ==========
@@ -1168,7 +1168,7 @@ mai_bind_cmd = on_command("绑定", priority=5)
 async def handle_mai_bind(event: MessageEvent):
     """绑定好友码：/绑定 好友码（仅私聊）"""
     if hasattr(event, 'group_id') and event.group_id:
-        await mai_bind_cmd.finish("...绑定命令只能私聊使用。请私聊我发送。")
+        await mai_bind_cmd.send("...绑定命令只能私聊使用。请私聊我发送。")
         return
     user_id = str(event.user_id)
     content = str(event.message).strip()
@@ -1182,7 +1182,7 @@ async def handle_mai_bind(event: MessageEvent):
         info = binds.get(user_id, {})
         fc = info.get("friend_code", "未绑定")
         df = info.get("diving_fish", "未绑定")
-        await mai_bind_cmd.finish(f"当前绑定信息：\n好友码：{fc}\n水鱼账号：{df}")
+        await mai_bind_cmd.send(f"当前绑定信息：\n好友码：{fc}\n水鱼账号：{df}")
         return
 
     # 验证好友码（纯数字，通常7-10位）
@@ -1191,7 +1191,7 @@ async def handle_mai_bind(event: MessageEvent):
         if friend_code < 1000000 or friend_code > 9999999999:
             raise ValueError
     except ValueError:
-        await mai_bind_cmd.finish("...好友码格式不对。应该是7-10位纯数字。")
+        await mai_bind_cmd.send("...好友码格式不对。应该是7-10位纯数字。")
         return
 
     # 验证好友码是否有效（通过落雪API测试）
@@ -1200,7 +1200,7 @@ async def handle_mai_bind(event: MessageEvent):
         test_url = f"https://maimai.lxns.net/api/v0/maimai/player/{friend_code}/plate/6101"
         resp = await http_client.get(test_url, timeout=10.0)
         if resp.status_code == 404:
-            await mai_bind_cmd.finish("...找不到这个好友码对应的数据。检查一下？")
+            await mai_bind_cmd.send("...找不到这个好友码对应的数据。检查一下？")
             return
     except httpx.TimeoutException:
         pass  # 超时不一定是好友码无效，继续绑定
@@ -1211,7 +1211,7 @@ async def handle_mai_bind(event: MessageEvent):
         binds[user_id] = {}
     binds[user_id]["friend_code"] = friend_code
     save_binds(binds)
-    await mai_bind_cmd.finish(f"[OK] 好友码 {friend_code} 绑定成功！\n现在可以直接发 /牌子 查询版本牌子了。")
+    await mai_bind_cmd.send(f"[OK] 好友码 {friend_code} 绑定成功！\n现在可以直接发 /牌子 查询版本牌子了。")
 
 
 # 绑定水鱼用户名（用于查分B50/B40）
@@ -1221,7 +1221,7 @@ mai_bind_df_cmd = on_command("绑定水鱼", priority=5)
 async def handle_mai_bind_df(event: MessageEvent):
     """绑定水鱼用户名：/绑定水鱼 用户名（仅私聊）"""
     if hasattr(event, 'group_id') and event.group_id:
-        await mai_bind_df_cmd.finish("...绑定命令只能私聊使用。请私聊我发送。")
+        await mai_bind_df_cmd.send("...绑定命令只能私聊使用。请私聊我发送。")
         return
     user_id = str(event.user_id)
     content = str(event.message).strip()
@@ -1231,7 +1231,7 @@ async def handle_mai_bind_df(event: MessageEvent):
             break
 
     if not content:
-        await mai_bind_df_cmd.finish("...用户名呢。格式：/绑定水鱼 水鱼用户名")
+        await mai_bind_df_cmd.send("...用户名呢。格式：/绑定水鱼 水鱼用户名")
         return
 
     binds = load_binds()
@@ -1239,7 +1239,7 @@ async def handle_mai_bind_df(event: MessageEvent):
         binds[user_id] = {}
     binds[user_id]["diving_fish"] = content
     save_binds(binds)
-    await mai_bind_df_cmd.finish(f"[OK] 水鱼账号「{content}」绑定成功！\n现在可以直接发 /mai b50 查分了。")
+    await mai_bind_df_cmd.send(f"[OK] 水鱼账号「{content}」绑定成功！\n现在可以直接发 /mai b50 查分了。")
 
 
 # 解绑
@@ -1249,7 +1249,7 @@ mai_unbind_cmd = on_command("解绑", priority=5)
 async def handle_mai_unbind(event: MessageEvent):
     """解绑：/解绑（仅私聊）"""
     if hasattr(event, 'group_id') and event.group_id:
-        await mai_unbind_cmd.finish("...解绑只能私聊使用。请私聊我发送。")
+        await mai_unbind_cmd.send("...解绑只能私聊使用。请私聊我发送。")
         return
     user_id = str(event.user_id)
     binds = load_binds()
@@ -1258,9 +1258,9 @@ async def handle_mai_unbind(event: MessageEvent):
         save_binds(binds)
         fc = old.get("friend_code", "?")
         df = old.get("diving_fish", "?")
-        await mai_unbind_cmd.finish(f"已解除绑定（好友码:{fc}，水鱼:{df}）。")
+        await mai_unbind_cmd.send(f"已解除绑定（好友码:{fc}，水鱼:{df}）。")
     else:
-        await mai_unbind_cmd.finish("你本来就没绑定过。")
+        await mai_unbind_cmd.send("你本来就没绑定过。")
 
 
 # 绑定水鱼Token（用于QQ号查分）
@@ -1270,7 +1270,7 @@ mai_bind_token_cmd = on_command("绑定token", priority=5)
 async def handle_mai_bind_token(event: MessageEvent):
     """绑定水鱼Token：/绑定token 你的token（仅私聊）"""
     if hasattr(event, 'group_id') and event.group_id:
-        await mai_bind_token_cmd.finish("...绑定命令只能私聊使用。请私聊我发送。")
+        await mai_bind_token_cmd.send("...绑定命令只能私聊使用。请私聊我发送。")
         return
     user_id = str(event.user_id)
     content = str(event.message).strip()
@@ -1285,7 +1285,7 @@ async def handle_mai_bind_token(event: MessageEvent):
     content_clean = re.sub(r'\s+', '', content)
     hex_matches = re.findall(r'[0-9a-fA-F]{32,}', content_clean)
     if not hex_matches:
-        await mai_bind_token_cmd.finish("...token呢。在水鱼官网→编辑个人资料→生成Token\n格式：/绑定token 你的token")
+        await mai_bind_token_cmd.send("...token呢。在水鱼官网→编辑个人资料→生成Token\n格式：/绑定token 你的token")
         return
     # 取最长的匹配（通常是真正的 token）
     token_clean = max(hex_matches, key=len)
@@ -1296,7 +1296,7 @@ async def handle_mai_bind_token(event: MessageEvent):
     binds[user_id]["diving_fish_token"] = token_clean
     save_binds(binds)
     logger.info(f"[绑定] Token已保存: user={user_id}, path={MAIMAI_BINDS_FILE}")
-    await mai_bind_token_cmd.finish("[OK] 水鱼Token绑定成功！\n现在直接发 /mai b50 就能查分了。")
+    await mai_bind_token_cmd.send("[OK] 水鱼Token绑定成功！\n现在直接发 /mai b50 就能查分了。")
 
 
 # ========== 版本牌子查询 ==========
@@ -1317,7 +1317,7 @@ async def handle_mai_plate(event: MessageEvent):
     df_username = info.get("diving_fish", "")
 
     if not df_token and not df_username:
-        await mai_plate_cmd.finish("...还没绑定水鱼账号。私聊发 /绑定token 你的token 或 /绑定水鱼 用户名")
+        await mai_plate_cmd.send("...还没绑定水鱼账号。私聊发 /绑定token 你的token 或 /绑定水鱼 用户名")
         return
 
     try:
@@ -1356,14 +1356,14 @@ async def handle_mai_plate(event: MessageEvent):
                 )
 
             if resp.status_code == 400:
-                await mai_plate_cmd.finish("...获取成绩失败。可能是Token过期或用户设置了隐私保护。\n请重新绑定Token：/绑定token 新token")
+                await mai_plate_cmd.send("...获取成绩失败。可能是Token过期或用户设置了隐私保护。\n请重新绑定Token：/绑定token 新token")
                 return
             resp.raise_for_status()
             player_data = resp.json()
 
             if "error" in player_data or "status" in player_data:
                 err = player_data.get("error", player_data.get("message", "未知错误"))
-                await mai_plate_cmd.finish(f"...查询失败：{err}")
+                await mai_plate_cmd.send(f"...查询失败：{err}")
                 return
 
             # 如果是 /player/records 格式，转换为 charts.dx/sd
@@ -1378,7 +1378,7 @@ async def handle_mai_plate(event: MessageEvent):
         # 2. 获取歌曲数据（版本信息）
         music_data = await get_music_data()
         if not music_data:
-            await mai_plate_cmd.finish("...获取歌曲数据失败。稍后再试。")
+            await mai_plate_cmd.send("...获取歌曲数据失败。稍后再试。")
             return
 
         # 构建歌曲版本映射
@@ -1519,18 +1519,18 @@ async def handle_mai_plate(event: MessageEvent):
         msg += f"━━━━━━━━━━━━━━\n进度：{done_plates}/{total_plates}"
         if done_plates == total_plates:
             msg += " 全制霸！"
-        await mai_plate_cmd.finish(msg)
+        await mai_plate_cmd.send(msg)
 
     except httpx.TimeoutException:
-        await mai_plate_cmd.finish("...水鱼API超时了，稍后再试。")
+        await mai_plate_cmd.send("...水鱼API超时了，稍后再试。")
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
         if status == 400:
-            await mai_plate_cmd.finish("...获取成绩失败。Token可能过期了，请重新绑定。")
+            await mai_plate_cmd.send("...获取成绩失败。Token可能过期了，请重新绑定。")
         else:
-            await mai_plate_cmd.finish(f"...请求出错（HTTP {status}）。")
+            await mai_plate_cmd.send(f"...请求出错（HTTP {status}）。")
     except FinishedException:
         raise
     except Exception as e:
         logger.error(f"[牌子查询] 出错: {e}")
-        await mai_plate_cmd.finish("...查询出错了，稍后再试。")
+        await mai_plate_cmd.send("...查询出错了，稍后再试。")

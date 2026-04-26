@@ -39,7 +39,7 @@ def _is_cmd_allowed(cmd: str) -> bool:
 async def _cmd_run(event: MessageEvent):
     """远程执行命令：/run <命令>"""
     if not check_superuser(str(event.user_id)):
-        await run_cmd.finish("...你不是管理员。")
+        await run_cmd.send("...你不是管理员。")
         return
 
     content = str(event.message).strip()
@@ -49,11 +49,11 @@ async def _cmd_run(event: MessageEvent):
             break
 
     if not content:
-        await run_cmd.finish("...格式：/run <命令>\n示例：/run ls -la\n/run python -c \"print('hello')\"")
+        await run_cmd.send("...格式：/run <命令>\n示例：/run ls -la\n/run python -c \"print('hello')\"")
         return
 
     if not _is_cmd_allowed(content):
-        await run_cmd.finish("...这个命令不在白名单里。")
+        await run_cmd.send("...这个命令不在白名单里。")
         return
 
     await run_cmd.send(f"...执行中：`{content}`")
@@ -88,7 +88,7 @@ async def _cmd_run(event: MessageEvent):
         except asyncio.TimeoutError:
             proc.kill()
             await proc.wait()
-            await run_cmd.finish(f"...执行超时（{_CMD_TIMEOUT}秒），已终止。")
+            await run_cmd.send(f"...执行超时（{_CMD_TIMEOUT}秒），已终止。")
             return
 
         stdout_str = stdout.decode("utf-8", errors="replace").strip()
@@ -108,10 +108,10 @@ async def _cmd_run(event: MessageEvent):
             result = result[:_MAX_OUTPUT] + f"\n...（输出过长，已截断，共{len(result)}字符）"
 
         msg = f"退出码：{exit_code}\n{'━' * 20}\n{result}"
-        await run_cmd.finish(msg)
+        await run_cmd.send(msg)
 
     except Exception as e:
-        await run_cmd.finish(f"...执行出错：{type(e).__name__}: {e}")
+        await run_cmd.send(f"...执行出错：{type(e).__name__}: {e}")
 
 
 run_cmd = _register("run", _cmd_run, aliases=["执行"], priority=1, admin_only=True)
@@ -120,7 +120,7 @@ run_cmd = _register("run", _cmd_run, aliases=["执行"], priority=1, admin_only=
 async def _cmd_exec(event: MessageEvent):
     """执行上传的脚本：发脚本文件给bot（需@），自动执行"""
     if not check_superuser(str(event.user_id)):
-        await exec_cmd.finish("...你不是管理员。")
+        await exec_cmd.send("...你不是管理员。")
         return
 
     # 检查消息是否包含文件
@@ -150,19 +150,19 @@ async def _cmd_exec(event: MessageEvent):
             break
 
     if not has_file or not file_data:
-        await exec_cmd.finish("...请发送脚本文件给我执行。\n格式：@希亚 + 文件\n支持的格式：.py .sh .bat .js .lua .rb .go")
+        await exec_cmd.send("...请发送脚本文件给我执行。\n格式：@希亚 + 文件\n支持的格式：.py .sh .bat .js .lua .rb .go")
         return
 
     # 检查文件大小
     if len(file_data) > _MAX_SCRIPT_SIZE:
-        await exec_cmd.finish(f"...文件太大（{len(file_data)/1024:.1f}KB），最大允许{_MAX_SCRIPT_SIZE/1024:.0f}KB。")
+        await exec_cmd.send(f"...文件太大（{len(file_data)/1024:.1f}KB），最大允许{_MAX_SCRIPT_SIZE/1024:.0f}KB。")
         return
 
     # 检查扩展名
     _, ext = os.path.splitext(file_name)
     ext = ext.lower()
     if ext not in _ALLOWED_SCRIPT_EXT:
-        await exec_cmd.finish(f"...不支持的文件格式 {ext}。\n支持：{', '.join(sorted(_ALLOWED_SCRIPT_EXT))}")
+        await exec_cmd.send(f"...不支持的文件格式 {ext}。\n支持：{', '.join(sorted(_ALLOWED_SCRIPT_EXT))}")
         return
 
     await exec_cmd.send(f"...收到脚本 `{file_name}`（{len(file_data)/1024:.1f}KB），执行中...")
@@ -213,7 +213,7 @@ async def _cmd_exec(event: MessageEvent):
         except asyncio.TimeoutError:
             proc.kill()
             await proc.wait()
-            await exec_cmd.finish(f"...脚本执行超时（{_SCRIPT_TIMEOUT}秒），已终止。")
+            await exec_cmd.send(f"...脚本执行超时（{_SCRIPT_TIMEOUT}秒），已终止。")
             return
 
         stdout_str = stdout.decode("utf-8", errors="replace").strip()
@@ -232,10 +232,10 @@ async def _cmd_exec(event: MessageEvent):
             result = result[:_MAX_OUTPUT] + f"\n...（输出过长，已截断）"
 
         msg = f"📄 `{file_name}` 退出码：{exit_code}\n{'━' * 20}\n{result}"
-        await exec_cmd.finish(msg)
+        await exec_cmd.send(msg)
 
     except Exception as e:
-        await exec_cmd.finish(f"...执行出错：{type(e).__name__}: {e}")
+        await exec_cmd.send(f"...执行出错：{type(e).__name__}: {e}")
     finally:
         # 递归清理临时目录
         try:

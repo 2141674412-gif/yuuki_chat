@@ -53,24 +53,24 @@ async def _cmd_calc(event: MessageEvent):
     expr = str(event.message).replace("计算器", "").strip()
 
     if not expr:
-        await calc_cmd.finish("...算什么。你倒是给我算式啊。")
+        await calc_cmd.send("...算什么。你倒是给我算式啊。")
 
     if not re.match(r'^[\d+\-*/().\s^eE]+$', expr):
-        await calc_cmd.finish("这个我算不了。太复杂了。")
+        await calc_cmd.send("这个我算不了。太复杂了。")
         return
 
     try:
         result = safe_eval(expr)
         if isinstance(result, float) and result == int(result):
             result = int(result)
-        await calc_cmd.finish(f"{result}。这种程度的问题...不需要正义的伙伴吧。")
+        await calc_cmd.send(f"{result}。这种程度的问题...不需要正义的伙伴吧。")
     except ZeroDivisionError:
-        await calc_cmd.finish("...除以零了。你故意的吧。")
+        await calc_cmd.send("...除以零了。你故意的吧。")
     except (ValueError, SyntaxError):
-        await calc_cmd.finish("这个我算不了。太复杂了。")
+        await calc_cmd.send("这个我算不了。太复杂了。")
     except FinishedException:
         raise
     except Exception:
-        await calc_cmd.finish("...算错了。不怪我。")
+        await calc_cmd.send("...算错了。不怪我。")
 
 calc_cmd = _register("计算器", _cmd_calc)

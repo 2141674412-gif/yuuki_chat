@@ -62,12 +62,12 @@ async def _cmd_birthday(event: MessageEvent):
     """查看生日：/生日 或 /birthday"""
     gid = str(getattr(event, 'group_id', 0))
     if not gid:
-        await birthday_cmd.finish("...只能在群里查看生日。")
+        await birthday_cmd.send("...只能在群里查看生日。")
         return
 
     group_data = _birthdays.get(gid, {})
     if not group_data:
-        await birthday_cmd.finish("...这个群还没有人设置生日。\n用法：/设置生日 MM-DD（如：/设置生日 12-01）")
+        await birthday_cmd.send("...这个群还没有人设置生日。\n用法：/设置生日 MM-DD（如：/设置生日 12-01）")
         return
 
     # 按日期排序
@@ -99,7 +99,7 @@ async def _cmd_birthday(event: MessageEvent):
         except (ValueError, IndexError):
             lines.append(f"   {name}（{bdate}）")
 
-    await birthday_cmd.finish("\n".join(lines))
+    await birthday_cmd.send("\n".join(lines))
 
 
 async def _cmd_set_birthday(event: MessageEvent):
@@ -113,15 +113,15 @@ async def _cmd_set_birthday(event: MessageEvent):
     gid = str(getattr(event, 'group_id', 0))
     uid = str(event.user_id)
     if not gid:
-        await set_birthday_cmd.finish("...只能在群里设置生日。")
+        await set_birthday_cmd.send("...只能在群里设置生日。")
         return
 
     if not content:
         info = _birthdays.get(gid, {}).get(uid)
         if info:
-            await set_birthday_cmd.finish(f"...你设置的生日是：{info['date']}\n修改：/设置生日 MM-DD\n删除：/删除生日")
+            await set_birthday_cmd.send(f"...你设置的生日是：{info['date']}\n修改：/设置生日 MM-DD\n删除：/删除生日")
         else:
-            await set_birthday_cmd.finish("...你还没设置生日。\n用法：/设置生日 MM-DD（如：/设置生日 12-01）")
+            await set_birthday_cmd.send("...你还没设置生日。\n用法：/设置生日 MM-DD（如：/设置生日 12-01）")
         return
 
     if content in ("取消", "删除", "清除"):
@@ -130,9 +130,9 @@ async def _cmd_set_birthday(event: MessageEvent):
             if not _birthdays[gid]:
                 del _birthdays[gid]
             _save_birthdays(_birthdays)
-            await set_birthday_cmd.finish("...已删除你的生日设置。")
+            await set_birthday_cmd.send("...已删除你的生日设置。")
         else:
-            await set_birthday_cmd.finish("...你还没设置生日。")
+            await set_birthday_cmd.send("...你还没设置生日。")
         return
 
     # 解析日期 MM-DD
@@ -154,7 +154,7 @@ async def _cmd_set_birthday(event: MessageEvent):
         if day > max_day:
             raise ValueError
     except (ValueError, IndexError):
-        await set_birthday_cmd.finish("...日期格式不对，用 MM-DD 格式，如：/设置生日 12-01")
+        await set_birthday_cmd.send("...日期格式不对，用 MM-DD 格式，如：/设置生日 12-01")
         return
 
     date_str = f"{month:02d}-{day:02d}"
@@ -171,7 +171,7 @@ async def _cmd_set_birthday(event: MessageEvent):
     _birthdays[gid][uid] = {"date": date_str, "name": sender_name}
     _save_birthdays(_birthdays)
 
-    await set_birthday_cmd.finish(f"...已设置你的生日为 {date_str}，到时候会自动祝福你！")
+    await set_birthday_cmd.send(f"...已设置你的生日为 {date_str}，到时候会自动祝福你！")
 
 
 async def _cmd_del_birthday(event: MessageEvent):
@@ -184,9 +184,9 @@ async def _cmd_del_birthday(event: MessageEvent):
         if not _birthdays[gid]:
             del _birthdays[gid]
         _save_birthdays(_birthdays)
-        await del_birthday_cmd.finish("...已删除你的生日设置。")
+        await del_birthday_cmd.send("...已删除你的生日设置。")
     else:
-        await del_birthday_cmd.finish("...你还没设置生日。")
+        await del_birthday_cmd.send("...你还没设置生日。")
 
 
 async def _check_birthdays():

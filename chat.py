@@ -242,7 +242,7 @@ async def handle_sleep_at(event: GroupMessageEvent):
 
     # 随机回复
     reply = random.choice(_SLEEP_REPLIES)
-    await _sleep_cmd.finish(reply)
+    await _sleep_cmd.send(reply)
 
 
 # 消息处理（优先级 1，block=False 让命令能继续传递）
@@ -385,7 +385,7 @@ async def handle_chat(event: MessageEvent):
             except Exception:
                 pass
 
-        await chat.finish(ai_response)
+        await chat.send(ai_response)
 
     except FinishedException:
         raise
@@ -396,13 +396,13 @@ async def handle_chat(event: MessageEvent):
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
             chat_history[user_id].pop()
         fallback = "嗯...正义的伙伴好像走神了，再说一次？"
-        await chat.finish(fallback)
+        await chat.send(fallback)
     except APIError as e:
         # API 错误（如服务不可用、速率限制等）
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
             chat_history[user_id].pop()
         fallback = "唔...脑袋好像有点转不过来，等一下再来吧。"
-        await chat.finish(fallback)
+        await chat.send(fallback)
     except Exception as e:
         # 其他未预期的错误
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
@@ -417,7 +417,7 @@ async def handle_chat(event: MessageEvent):
         ]
 
         ai_response = random.choice(fallback)
-        await chat.finish(ai_response)
+        await chat.send(ai_response)
 
 
 # ========== AI 生成回复 ==========
@@ -587,7 +587,7 @@ async def handle_chatter(event: GroupMessageEvent):
             return
         reply = await _ai_generate_reply(message, _MENTIONED_SYSTEM_PROMPT)
         if reply:
-            await chatter.finish(reply)
+            await chatter.send(reply)
         return
 
     # 计算插话概率：基础概率 + 话题关键词加成
@@ -606,7 +606,7 @@ async def handle_chatter(event: GroupMessageEvent):
     if not reply:
         reply = random.choice(_FALLBACK_TOPICS)
 
-    await chatter.finish(reply)
+    await chatter.send(reply)
 
 
 # ========== 自动识别二维码 ==========
@@ -654,10 +654,10 @@ async def handle_qrcode(event: MessageEvent):
                     # 如果是SGWCMAID开头的二维码，回复识别结果
                     if text.startswith("SGWCMAID"):
                         logger.debug(f"[二维码] 检测到SGWCMAID: {event.message_id}")
-                        await _qrcode.finish(f"识别到机台二维码：\n{text}")
+                        await _qrcode.send(f"识别到机台二维码：\n{text}")
                         return
                     else:
-                        await _qrcode.finish(f"识别到二维码：\n{text}")
+                        await _qrcode.send(f"识别到二维码：\n{text}")
             except FinishedException:
                 raise
             except Exception as e:
@@ -1186,9 +1186,9 @@ type规则：支出→"expense"，收入→"income"
                                             if saved_count == 1:
                                                 r = records[0] if records else {}
                                                 icon = "📥" if r.get("type") == "income" else "📤"
-                                                await _img_chat.finish(f"{icon} 已记录：{r.get('category','其他')} {r.get('note','')} {'+' if r.get('type')=='income' else '-'}{float(r.get('amount',0)):.0f}")
+                                                await _img_chat.send(f"{icon} 已记录：{r.get('category','其他')} {r.get('note','')} {'+' if r.get('type')=='income' else '-'}{float(r.get('amount',0)):.0f}")
                                             else:
-                                                await _img_chat.finish(f"✅ 已记录 {saved_count} 笔交易。")
+                                                await _img_chat.send(f"✅ 已记录 {saved_count} 笔交易。")
                                 except (json.JSONDecodeError, ValueError):
                                     pass
                             # 识别失败，走正常识图
@@ -1252,7 +1252,7 @@ type规则：支出→"expense"，收入→"income"
             if len(chat_history[user_id]) > 21:
                 chat_history[user_id] = [chat_history[user_id][0]] + chat_history[user_id][-20:]
             _history_timestamps[user_id] = time.time()
-            await _img_chat.finish(reply)
+            await _img_chat.send(reply)
     except FinishedException:
         raise
     except Exception as e:
