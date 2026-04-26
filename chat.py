@@ -12,6 +12,7 @@ from io import BytesIO
 # 第三方库
 import numpy as np
 from nonebot import get_bot, get_driver, logger, on_message
+from nonebot.config import Config as _NbConfig
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent
 from nonebot.exception import FinishedException
 from openai import APIError, APITimeoutError, OpenAI
@@ -19,7 +20,11 @@ from PIL import Image
 from qreader import QReader
 
 # 本地模块
-from .config import ALLOWED_GROUPS, COMMAND_NAMES, load_persona, DATA_DIR, CHAT_BLACKLIST, CHAT_WHITELIST, SUPERUSERS
+from .config import ALLOWED_GROUPS, COMMAND_NAMES, load_persona, DATA_DIR, CHAT_BLACKLIST, CHAT_WHITELIST
+
+# 获取superusers
+_nb_cfg = _NbConfig()
+SUPERUSERS = set(str(s) for s in _nb_cfg.superusers)
 from .commands_sticker import get_sticker_message
 
 # ========== 配置读取（兼容 .env 大写和 section 两种格式） ==========
