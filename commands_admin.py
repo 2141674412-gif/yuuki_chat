@@ -41,6 +41,7 @@ async def _cmd_set_persona(event: MessageEvent):
 
     if not new_persona:
         await _send(event, "...内容呢。格式：/修改人设 [内容]")
+        return
 
     try:
         save_persona(new_persona)

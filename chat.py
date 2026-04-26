@@ -12,8 +12,15 @@ from io import BytesIO
 # 第三方库
 import numpy as np
 from nonebot import get_bot, get_driver, logger, on_message
-from nonebot.config import Config as _NbConfig
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent
+
+# 获取superusers（延迟获取，等driver初始化后）
+def _get_superusers() -> set:
+    try:
+        cfg = get_driver().config
+        return set(str(s) for s in getattr(cfg, "superusers", set()))
+    except Exception:
+        return set()
+from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent, MessageSegment
 from nonebot.exception import FinishedException
 from openai import APIError, APITimeoutError, OpenAI
 from PIL import Image
@@ -21,10 +28,6 @@ from qreader import QReader
 
 # 本地模块
 from .config import ALLOWED_GROUPS, COMMAND_NAMES, load_persona, DATA_DIR, CHAT_BLACKLIST, CHAT_WHITELIST
-
-# 获取superusers
-_nb_cfg = _NbConfig()
-SUPERUSERS = set(str(s) for s in _nb_cfg.superusers)
 from .commands_sticker import get_sticker_message
 
 # ========== 配置读取（兼容 .env 大写和 section 两种格式） ==========
@@ -300,7 +303,7 @@ async def handle_chat(event: MessageEvent):
             return
     else:
         # 私聊：只有白名单用户或superuser可以私聊
-        if user_id not in CHAT_WHITELIST and user_id not in SUPERUSERS:
+        if user_id not in CHAT_WHITELIST and user_id not in _get_superusers():
             return
 
     # 被@但没有文字内容时，给一个默认提示

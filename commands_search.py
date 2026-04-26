@@ -301,6 +301,7 @@ async def _cmd_search(event: MessageEvent):
         cached = _search_cache[cache_key]
         if time.time() - cached["time"] < _SEARCH_TTL:
             await _send(event, cached["text"])
+            return
 
     await _send(event, "正在搜索中...")
 
@@ -336,6 +337,7 @@ async def _cmd_search(event: MessageEvent):
                 oldest = min(_search_cache, key=lambda k: _search_cache[k]["time"])
                 del _search_cache[oldest]
             await _send(event, text)
+            return
 
     await _send(event, f"...没搜到「{content}」的相关结果。换个关键词试试？")
 

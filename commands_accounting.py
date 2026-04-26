@@ -196,6 +196,7 @@ async def _cmd_bill(event: MessageEvent):
 
     if not filtered:
         await _send(event, "...这个时间段没有记录。")
+        return
 
     # 按分类汇总
     expense_by_cat = {}
@@ -286,6 +287,7 @@ async def _cmd_stats(event: MessageEvent):
 
     if not filtered:
         await _send(event, "...这个月还没有记录。")
+        return
 
     # 计算日均
     total_expense = sum(r["amount"] for r in filtered if r["type"] == "expense")

@@ -683,6 +683,7 @@ async def _cmd_music(event: MessageEvent):
 
     if not content:
         await _send(event, "...想听什么歌？告诉我歌名。")
+        return
 
     await _send(event, f"...在找「{content}」...")
 

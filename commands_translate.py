@@ -97,6 +97,7 @@ async def _cmd_translate(event: MessageEvent):
 
     if not content:
         await _send(event, "翻译什么。说清楚。格式：/翻译 内容\n或 /翻译 en 内容")
+        return
 
     target_lang = "en"
     text_to_translate = content
@@ -117,6 +118,7 @@ async def _cmd_translate(event: MessageEvent):
         _cached = _translate_cache[_cache_key]
         if time.time() - _cached["time"] < _TRANSLATE_TTL:
             await _send(event, f"{text_to_translate}\n→ {_cached['result']}（缓存）")
+            return
 
     apis = [_translate_api1, _translate_api2, _translate_api3]
 

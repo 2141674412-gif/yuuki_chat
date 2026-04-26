@@ -26,6 +26,7 @@ async def _cmd_remind(event: MessageEvent):
 
     if not content:
         await _send(event, "提醒你什么。说清楚。格式：/提醒 5分钟 写作业")
+        return
 
     user_id = str(event.user_id)
     now = datetime.now()
@@ -40,6 +41,7 @@ async def _cmd_remind(event: MessageEvent):
 
         if remind_time <= now:
             await _send(event, "时间已过，请设置未来的时间。")
+            return
 
         if user_id not in reminders:
             reminders[user_id] = []
@@ -64,11 +66,13 @@ async def _cmd_reminders(event: MessageEvent):
 
     if user_id not in reminders or not reminders[user_id]:
         await _send(event, "你没什么提醒。")
+        return
 
     now = datetime.now()
     active = [r for r in reminders[user_id] if r["time"] > now]
     if not active:
         await _send(event, "你没什么提醒。")
+        return
 
     lines = [f"{r['id']}. {r['content']} ({r['time'].strftime('%H:%M')})" for r in active]
     await _send(event, "你的提醒：\n" + "\n".join(lines))
@@ -82,11 +86,13 @@ async def _cmd_cancel_remind(event: MessageEvent):
 
     if not remind_id_str:
         await _send(event, "取消哪个。说序号。")
+        return
 
     user_id = str(event.user_id)
 
     if user_id not in reminders or not reminders[user_id]:
         await _send(event, "你本来就没提醒。")
+        return
 
     try:
         remind_id = int(remind_id_str)
