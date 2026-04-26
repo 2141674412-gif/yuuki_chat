@@ -244,11 +244,22 @@ def _extract_update(filepath):
             extract_count += 1
 
     # 清理旧文件
-    for old in ["commands.py"]:
+    for old in ["commands.py", "commands_bilibili.py"]:
         old_path = os.path.join(plugin_dir, old)
         if os.path.exists(old_path):
             os.remove(old_path)
             extract_count += 1
+
+    # 安装第三方依赖
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q",
+             "nonebot-plugin-parser"],
+            timeout=120, capture_output=True
+        )
+        logger.info("[更新] 已安装 nonebot-plugin-parser")
+    except Exception as e:
+        logger.warning(f"[更新] 安装依赖失败: {e}")
 
     return extract_count
 
