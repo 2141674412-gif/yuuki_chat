@@ -719,11 +719,12 @@ async def handle_bilibili(event: MessageEvent):
             except (json.JSONDecodeError, TypeError):
                 pass
 
-    # 检测B站链接或BV号
-    if not re.search(r'bilibili\.com/video/|b23\.tv/|BV[a-zA-Z0-9]{6,}', full_text):
+    # 检测B站链接或BV号（JSON中/会被转义为\/，需要先反转义）
+    full_text_unescaped = full_text.replace('\\/', '/')
+    if not re.search(r'bilibili\.com/video/|b23\.tv/|BV[a-zA-Z0-9]{6,}', full_text_unescaped):
         return
 
-    bvid = _extract_bili_url(full_text)
+    bvid = _extract_bili_url(full_text_unescaped)
     if not bvid:
         return
 
