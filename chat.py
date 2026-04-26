@@ -141,9 +141,6 @@ chat_history = {}
 _group_chat_log = {}  # {group_id: [(timestamp, user_id, text), ...]}
 _GROUP_CHAT_LOG_TTL = 7 * 24 * 3600  # 保留最近 7 天的数据（秒）
 
-# 主人QQ号（模块级常量）
-_OWNER_ID = "2141674412"
-
 # 用户画像记忆（记住用户喜好/话题/习惯）
 _user_profiles = {}  # {user_id: {"topics": [...], "mentioned_count": int, "last_active": float}}
 _PROFILE_FILE = os.path.join(DATA_DIR, "user_profiles.json")
@@ -170,9 +167,11 @@ def _update_user_profile(user_id: str, message: str):
         _user_profiles[user_id] = {"topics": [], "mentioned_count": 0, "last_active": 0, "name": ""}
     profile = _user_profiles[user_id]
     profile["last_active"] = time.time()
+    profile["mentioned_count"] = profile.get("mentioned_count", 0) + 1
     # 提取关键词作为话题标签
+    message_lower = message.lower()
     for keyword in _TOPIC_KEYWORDS:
-        if keyword in message and keyword not in profile["topics"]:
+        if keyword.lower() in message_lower and keyword not in profile["topics"]:
             profile["topics"].append(keyword)
             if len(profile["topics"]) > 20:
                 profile["topics"] = profile["topics"][-20:]
@@ -372,7 +371,7 @@ async def handle_chat(event: MessageEvent):
     system_prompt = load_persona()
 
     # 对特定用户特殊对待
-    if user_id == _OWNER_ID:
+    if user_id == _get_owner_qq():
         system_prompt += "\n\n[特殊指令] 这是希亚最亲密的人（主人/搭档），对Ta要更加亲昵、依赖、偶尔撒娇，可以叫Ta'笨蛋'但语气要甜。不要用敬语，像对很熟的人一样随意。回复可以更长更详细。"
     else:
         # 普通用户保持正常距离感
@@ -403,7 +402,7 @@ async def handle_chat(event: MessageEvent):
             stream = client.chat.completions.create(
                 model=_cfg("model_name", "qwen2.5:7b-instruct"),
                 messages=messages,
-                max_tokens=int(_cfg("max_tokens", "1024")) if user_id == _OWNER_ID else int(_cfg("max_tokens", "512")),
+                max_tokens=int(_cfg("max_tokens", "1024")) if user_id == _get_owner_qq() else int(_cfg("max_tokens", "512")),
                 temperature=float(_cfg("temperature", "0.7")),
                 timeout=20.0,
                 stream=True,
@@ -448,7 +447,7 @@ async def handle_chat(event: MessageEvent):
         _update_user_profile(user_id, message)
 
         # 限制历史记录长度（主人保留更多上下文）
-        max_history = 21 if user_id == _OWNER_ID else 11  # 主人10轮，普通5轮
+        max_history = 21 if user_id == _get_owner_qq() else 11  # 主人10轮，普通5轮
         if len(chat_history[user_id]) > max_history:
             chat_history[user_id] = [chat_history[user_id][0]] + chat_history[user_id][-(max_history-1):]
 
@@ -1272,6 +1271,7 @@ type规则：支出→"expense"，收入→"income"
                                                 await _img_chat.send(f"已记录：{r.get('category','其他')} {r.get('note','')} {sign}{float(r.get('amount',0)):.0f}")
                                             else:
                                                 await _img_chat.send(f"已记录 {saved_count} 笔交易。")
+                                            return
                                 except (json.JSONDecodeError, ValueError):
                                     pass
                             # 识别失败，走正常识图
@@ -1307,7 +1307,7 @@ type规则：支出→"expense"，收入→"income"
             persona = load_persona()
             img_sys = persona + "\n\n---\n现在有人发了图片给你看，请仔细观察并给出自然的反应。\n"
             # 主人特殊对待
-            if str(event.user_id) == _OWNER_ID:
+            if str(event.user_id) == _get_owner_qq():
                 img_sys += "这是你最亲密的人发的图，反应可以更亲昵、更活泼。\n"
             img_sys += (
                 "观察要点:\n"
@@ -1328,7 +1328,7 @@ type规则：支出→"expense"，收入→"income"
                     {"role": "system", "content": img_sys},
                     {"role": "user", "content": user_content},
                 ],
-                max_tokens=int(_cfg("max_tokens", "1024")) if str(event.user_id) == _OWNER_ID else int(_cfg("max_tokens", "512")),
+                max_tokens=int(_cfg("max_tokens", "1024")) if str(event.user_id) == _get_owner_qq() else int(_cfg("max_tokens", "512")),
                 temperature=float(_cfg("temperature", "0.8")),
                 timeout=30.0
             )
@@ -1538,18 +1538,8 @@ async def on_bot_startup():
         logger.warning(f"[定时清理] 注册失败（APScheduler 可能未安装）: {e}")
 
 
-_last_event_time = time.time()
-
-
-def _record_event_time():
-    """记录最后一次收到事件的时间"""
-    global _last_event_time
-    _last_event_time = time.time()
-
-
 async def _check_bot_health():
     """检查bot连接是否健康，如果不健康尝试重连"""
-    global _last_event_time
     try:
         from nonebot import get_bot
         bot = get_bot()

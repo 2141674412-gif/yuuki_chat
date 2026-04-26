@@ -1,6 +1,7 @@
 # ========== 自动更新 ==========
 
 # 标准库
+import asyncio
 import hashlib
 import json
 import os
@@ -226,7 +227,7 @@ def _restore_backup():
                 pass
 
 
-def _extract_update(filepath):
+async def _extract_update(filepath):
     """解压更新包，返回更新的文件数"""
     plugin_dir = _get_plugin_dir()
     plugin_dir_real = os.path.realpath(plugin_dir)
@@ -263,11 +264,11 @@ def _extract_update(filepath):
 
     # 安装第三方依赖
     try:
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-q",
-             "nonebot-plugin-parser"],
-            timeout=120, capture_output=True
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-m", "pip", "install", "-q", "nonebot-plugin-parser",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
+        await asyncio.wait_for(proc.communicate(), timeout=120)
         logger.info("[更新] 已安装 nonebot-plugin-parser")
     except Exception as e:
         logger.warning(f"[更新] 安装依赖失败: {e}")
@@ -399,7 +400,7 @@ async def _cmd_update(event: MessageEvent):
 
         # 8. 解压
         await _send("...正在更新文件...")
-        extract_count = _extract_update(update_zip)
+        extract_count = await _extract_update(update_zip)
 
         # 9. 保存版本
         _save_version(remote_tag)

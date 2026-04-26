@@ -10,7 +10,6 @@ import json
 import logging
 import os
 import re
-import secrets
 import shutil
 import time
 from datetime import datetime
@@ -154,7 +153,9 @@ def _save_json(filepath: str, data) -> None:
 
 def _load_checkin_records() -> None:
     global checkin_records
-    checkin_records = _load_json(CHECKIN_FILE)
+    new_data = _load_json(CHECKIN_FILE) or {}
+    checkin_records.clear()
+    checkin_records.update(new_data)
 
 
 def _save_checkin_records() -> None:
@@ -172,7 +173,8 @@ def _load_reminders() -> None:
                         r[key] = datetime.fromisoformat(r[key])
                     except (ValueError, TypeError):
                         pass
-    reminders = raw
+    reminders.clear()
+    reminders.update(raw)
 
 
 def _save_reminders() -> None:
@@ -190,12 +192,15 @@ def _save_reminders() -> None:
 
 def _load_blacklist() -> None:
     global user_blacklist
+    new_data = set()
     if os.path.exists(BLACKLIST_FILE):
         try:
             with open(BLACKLIST_FILE, "r", encoding="utf-8") as f:
-                user_blacklist = set(json.load(f))
+                new_data = set(json.load(f))
         except (json.JSONDecodeError, OSError):
-            user_blacklist = set()
+            new_data = set()
+    user_blacklist.clear()
+    user_blacklist.update(new_data)
 
 def _save_blacklist() -> None:
     try:
@@ -205,7 +210,9 @@ def _save_blacklist() -> None:
 
 def _load_points() -> None:
     global user_points
-    user_points = _load_json(POINTS_FILE)
+    new_data = _load_json(POINTS_FILE) or {}
+    user_points.clear()
+    user_points.update(new_data)
 
 def _save_points() -> None:
     _save_json(POINTS_FILE, user_points)
@@ -295,6 +302,8 @@ def _register(name, handler, aliases=None, priority=5, admin_only=False):
             return  # 冷却中，静默忽略
         try:
             await handler(event)
+        except FinishedException:
+            raise
         except Exception as e:
             logger.error(f"[命令] 执行失败: {type(e).__name__}: {e}")
             try:

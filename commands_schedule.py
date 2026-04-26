@@ -46,11 +46,10 @@ _load_scheduled_tasks()
 
 async def _cmd_schedule(event: MessageEvent):
     """定时任务：/定时 时间 内容 或 /定时 每天 时间 内容 或 /定时 30m 喝水（一次性）"""
-    if not isinstance(event, MessageEvent):
-        from nonebot.adapters.onebot.v11 import GroupMessageEvent
-        if not isinstance(event, GroupMessageEvent):
-            await _send(event, "...这个命令只能在群里用哦。")
-            return
+    group_id = str(getattr(event, 'group_id', 0))
+    if not group_id or group_id == "0":
+        await _send(event, "...这个命令只能在群里用哦。")
+        return
     content = str(event.message).strip()
     for prefix in ["定时"]:
         if content.startswith(prefix):
@@ -63,8 +62,6 @@ async def _cmd_schedule(event: MessageEvent):
             "或：/定时 30m 喝水（一次性定时）"
         )
         return
-
-    group_id = str(getattr(event, 'group_id', 0))
 
     # ---- 一次性定时检测：\d+[smhd] 格式 ----
     onetime_match = re.match(r'(\d+[smhd])\s+(.*)', content)

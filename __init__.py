@@ -61,5 +61,10 @@ driver = get_driver()
 @driver.on_shutdown
 async def _shutdown():
     """关闭共享 HTTP 客户端"""
+    try:
+        from .chat import _save_user_profiles
+        _save_user_profiles()
+    except Exception:
+        pass
     from .utils import shutdown_http_client
     await shutdown_http_client()

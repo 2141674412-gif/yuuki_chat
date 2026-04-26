@@ -30,7 +30,6 @@ from .commands_base import (
 from .config import load_persona, save_persona, PERSONA_FILE
 from .chat import chat_history
 from .utils import get_font, make_default_cover
-from .maimai import load_binds, save_binds
 
 # ========== 简单命令 ==========
 
