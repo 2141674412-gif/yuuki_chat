@@ -45,17 +45,11 @@ async def _resolve_short_url(client, short_id: str) -> str:
     try:
         resp = await client.get(
             f"https://b23.tv/{short_id}",
+            headers=_BILI_HEADERS,
             timeout=5.0,
-            follow_redirects=False
+            follow_redirects=True
         )
-        location = resp.headers.get("Location", "")
-        if not location:
-            # 尝试跟随重定向
-            resp2 = await client.get(
-                f"https://b23.tv/{short_id}",
-                timeout=5.0
-            )
-            location = str(resp2.url)
+        location = str(resp.url)
         m = re.search(r'BV[a-zA-Z0-9]+', location)
         if m:
             return m.group(0)
@@ -64,17 +58,26 @@ async def _resolve_short_url(client, short_id: str) -> str:
     return ""
 
 
+_BILI_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://www.bilibili.com",
+}
+
+
 async def _get_video_info(client, bvid: str):
     """调用B站API获取视频信息"""
     try:
         resp = await client.get(
             "https://api.bilibili.com/x/web-interface/view",
             params={"bvid": bvid},
+            headers=_BILI_HEADERS,
             timeout=5.0
         )
         data = resp.json()
         if data.get("code") == 0:
             return data.get("data", {})
+        else:
+            logger.warning(f"[B站] API返回错误: {data.get('message', '')} code={data.get('code')}")
     except Exception as e:
         logger.warning(f"[B站] 获取视频信息失败: {e}")
     return {}
@@ -110,6 +113,7 @@ async def handle_bilibili(bot: Bot, event: MessageEvent):
     if not bili_ids:
         return
 
+    logger.info(f"[B站] 检测到链接: {bili_ids}")
     client = _get_http_client()
 
     for bid in bili_ids:
@@ -199,7 +203,7 @@ async def _build_card_image(title, up_name, up_face, pic, view, like, danmaku, b
     cover = None
     try:
         client = _get_http_client()
-        resp = await client.get(pic, timeout=10.0)
+        resp = await client.get(pic, headers=_BILI_HEADERS, timeout=10.0)
         if resp.status_code == 200:
             with open(cover_path, "wb") as f:
                 f.write(resp.content)
