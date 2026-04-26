@@ -67,7 +67,12 @@ _DEFAULT_CATEGORY = "其他"
 
 
 def _load_accounting() -> dict:
-    return _load_json(_ACCOUNTING_FILE) or {}
+    data = _load_json(_ACCOUNTING_FILE) or {}
+    # 限制每个用户的记录数量，防止数据膨胀
+    for uid in list(data.keys()):
+        if len(data[uid]) > 1000:
+            data[uid] = data[uid][-1000:]
+    return data
 
 
 def _save_accounting(data: dict):

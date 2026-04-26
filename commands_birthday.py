@@ -1,6 +1,7 @@
 # 生日提醒模块
 
 import os
+import random
 import time
 from datetime import datetime
 
@@ -161,7 +162,7 @@ async def _cmd_set_birthday(event: MessageEvent):
             raise ValueError
         # 简单校验天数
         import calendar
-        max_day = calendar.monthrange(2024, month)[1]  # 闰年作为参考
+        max_day = calendar.monthrange(datetime.now().year, month)[1]
         if day > max_day:
             raise ValueError
     except (ValueError, IndexError):
@@ -238,7 +239,7 @@ async def _check_birthdays():
 
             # 当天生日期
             if bdate == today_str and uid not in _blessed[date_key][gid]:
-                template = _BLESS_TEMPLATES[int(time.time()) % len(_BLESS_TEMPLATES)]
+                template = random.choice(_BLESS_TEMPLATES)
                 msg = template.format(nick=name)
                 try:
                     await bot.send_group_msg(group_id=int(gid), message=msg)
@@ -251,7 +252,7 @@ async def _check_birthdays():
 
             # 提前一天提醒
             if bdate == tomorrow_str and uid not in _blessed[date_key][gid]:
-                template = _REMIND_TEMPLATES[int(time.time()) % len(_REMIND_TEMPLATES)]
+                template = random.choice(_REMIND_TEMPLATES)
                 msg = template.format(nick=name)
                 try:
                     await bot.send_group_msg(group_id=int(gid), message=msg)

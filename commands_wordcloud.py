@@ -74,10 +74,11 @@ async def _cmd_wordcloud(event: MessageEvent):
         days = max(1, min(days, 30))  # 限制1-30天
 
     cutoff = time.time() - days * 24 * 3600
-    all_text = ""
+    parts = []
     for ts, uid, text in group_messages:
         if ts >= cutoff:
-            all_text += text + " "
+            parts.append(text)
+    all_text = " ".join(parts)
 
     if not all_text.strip():
         await _send(event, f"...最近{days}天没有群聊天记录可以统计。")

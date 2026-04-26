@@ -113,10 +113,10 @@ def _check_code_bugs():
                 if try_line < 0:
                     continue
 
-                # 检查 try 块内（try: 到这个 except 之间）是否有 .send() 或 .send()
+                # 检查 try 块内（try: 到这个 except 之间）是否有 .send() 或 .finish()
                 has_finish = False
                 for j in range(try_line + 1, i):
-                    if ".send(" in lines[j] or ".send(" in lines[j]:
+                    if ".send(" in lines[j] or ".finish(" in lines[j]:
                         has_finish = True
                         break
                 if not has_finish:

@@ -1,6 +1,7 @@
 # 标准库
 import asyncio
 import base64
+import functools
 import json
 import os
 import random
@@ -32,6 +33,10 @@ from .config import ALLOWED_GROUPS, COMMAND_NAMES, load_persona, DATA_DIR, CHAT_
 from .commands_base import user_blacklist
 from .commands_sticker import get_sticker_message
 
+# 预编译正则表达式
+_RE_AT_TAG = re.compile(r'\[at:qq=\d+\]')
+_RE_CQ_TAG = re.compile(r'\[CQ:[^\]]+\]')
+
 # ========== 配置读取（兼容 .env 大写和 section 两种格式） ==========
 
 # 配置缓存（NoneBot 配置启动后不变，缓存 dict 避免重复创建）
@@ -60,6 +65,12 @@ def _cfg(key: str, default: str = "") -> str:
         return _clean(val)
     return default
 
+def _cfg_int(key: str, default: int) -> int:
+    try:
+        return int(_cfg(key, str(default)))
+    except (ValueError, TypeError):
+        return default
+
 # 初始化 OpenAI 客户端（单例模式，支持断线重连）
 _client = None
 _client_lock = threading.Lock()
@@ -75,7 +86,6 @@ def _get_accounting_seen():
     global _accounting_seen_cache
     if not _accounting_seen_cache and os.path.exists(_ACCOUNTING_SEEN_FILE):
         try:
-            import json
             with open(_ACCOUNTING_SEEN_FILE, "r", encoding="utf-8") as f:
                 _accounting_seen_cache = json.load(f)
         except Exception:
@@ -85,7 +95,6 @@ def _get_accounting_seen():
 def _save_accounting_seen():
     try:
         os.makedirs(os.path.dirname(_ACCOUNTING_SEEN_FILE), exist_ok=True)
-        import json
         with open(_ACCOUNTING_SEEN_FILE, "w", encoding="utf-8") as f:
             json.dump(_accounting_seen_cache, f)
     except Exception:
@@ -237,6 +246,7 @@ _load_user_profiles()
 # ========== 艾特检测（睡觉模式） ==========
 
 # 将命令列表转为集合，加速查找主人QQ号
+@functools.lru_cache(maxsize=1)
 def _get_owner_qq() -> str:
     """获取主人 QQ 号"""
     try:
@@ -294,7 +304,7 @@ async def handle_sleep_at(event: GroupMessageEvent):
     # 检查消息里是否有"希亚"（主人提到希亚不算）
     message = str(event.message)
     # 去掉@标记后检查纯文本
-    plain = re.sub(r'\[at:qq=\d+\]', '', message).strip()
+    plain = _RE_AT_TAG.sub('', message).strip()
     if "希亚" in plain or "Noa" in plain.lower():
         return
 
@@ -312,7 +322,7 @@ async def handle_chat(event: MessageEvent):
     message = str(event.message)
 
     # 提取纯文本（去掉 @ 标记和开头的 /）
-    plain_text = re.sub(r'\[at:qq=\d+\]', '', message).strip()
+    plain_text = _RE_AT_TAG.sub('', message).strip()
     if plain_text.startswith("/"):
         plain_text = plain_text[1:].strip()
 
@@ -402,7 +412,7 @@ async def handle_chat(event: MessageEvent):
             stream = client.chat.completions.create(
                 model=_cfg("model_name", "qwen2.5:7b-instruct"),
                 messages=messages,
-                max_tokens=int(_cfg("max_tokens", "1024")) if user_id == _get_owner_qq() else int(_cfg("max_tokens", "512")),
+                max_tokens=_cfg_int("max_tokens", 1024) if user_id == _get_owner_qq() else _cfg_int("max_tokens", 512),
                 temperature=float(_cfg("temperature", "0.7")),
                 timeout=20.0,
                 stream=True,
@@ -648,7 +658,7 @@ async def handle_chatter(event: GroupMessageEvent):
 
     # 跳过所有命令（带/或不带/，如"点歌 xxx"也是命令）
     msg_lower = message.lower().lstrip("/")
-    if any(msg_lower == cmd or msg_lower.startswith(cmd + " ") for cmd in COMMAND_SET):
+    if any(msg_lower == cmd.lower() or msg_lower.startswith(cmd.lower() + " ") for cmd in COMMAND_SET):
         return
 
     # 检测是否提到bot名字（希亚/Noa/正义的伙伴等）
@@ -665,7 +675,6 @@ async def handle_chatter(event: GroupMessageEvent):
         return
 
     # 计算插话概率：基础概率 + 话题关键词加成
-    msg_lower = message.lower()
     max_prob = CHATTER_BASE_PROBABILITY
     for keyword, prob in _TOPIC_KEYWORDS.items():
         if keyword.lower() in msg_lower:
@@ -800,8 +809,7 @@ async def handle_bilibili(event: MessageEvent):
             full_text += raw_json
             # 尝试解析JSON，递归查找B站链接
             try:
-                import json as _json
-                json_data = _json.loads(raw_json)
+                json_data = json.loads(raw_json)
                 def _find_bili(obj):
                     if isinstance(obj, str):
                         if re.search(r'bilibili\.com/video/|b23\.tv/|BV[a-zA-Z0-9]{6,}', obj):
@@ -825,7 +833,7 @@ async def handle_bilibili(event: MessageEvent):
                 extra = _find_bili(json_data)
                 if extra:
                     full_text += " " + extra
-            except (_json.JSONDecodeError, TypeError):
+            except (json.JSONDecodeError, TypeError):
                 pass
 
     # 反转义JSON中的\/
@@ -851,7 +859,6 @@ async def handle_bilibili(event: MessageEvent):
     logger.info(f"[B站] 检测到: {bvid}")
 
     try:
-        client = _get_http_client()
         resp = await client.get(
             "https://api.bilibili.com/x/web-interface/view",
             params={"bvid": bvid},
@@ -1008,9 +1015,9 @@ async def handle_image_chat(event: MessageEvent):
     for seg in event.message:
         if seg.type == "text":
             plain += seg.data.get("text", "")
-    plain = re.sub(r'\[at:qq=\d+\]', '', plain).strip()
+    plain = _RE_AT_TAG.sub('', plain).strip()
     # 去掉CQ码残留
-    plain = re.sub(r'\[CQ:[^\]]+\]', '', plain).strip()
+    plain = _RE_CQ_TAG.sub('', plain).strip()
 
     # 截图记账模式：有图片+提到"记/记账" 或 纯图片（无文字）不需要@bot
     # 但如果被@了，强制走识图模式
@@ -1186,7 +1193,6 @@ type规则：支出→"expense"，收入→"income"
                         response = await loop.run_in_executor(None, _do_accounting_vision)
                         if response.choices and response.choices[0].message.content:
                             reply = response.choices[0].message.content.strip()
-                            import json
                             json_match = re.search(r'\{.*\}', reply, re.DOTALL)
                             if json_match:
                                 try:
@@ -1216,13 +1222,13 @@ type规则：支出→"expense"，收入→"income"
                                         records = [r for r in records if "余额" not in r.get("note", "") and "余额" not in r.get("category", "")]
                                         # 4. 多条记录中去除重复金额
                                         if len(records) > 1:
-                                            seen_amounts = []
+                                            seen_amounts = set()
                                             filtered = []
                                             for r in records:
                                                 amt = float(r.get("amount", 0))
                                                 if amt in seen_amounts:
                                                     continue
-                                                seen_amounts.append(amt)
+                                                seen_amounts.add(amt)
                                                 filtered.append(r)
                                             records = filtered
 
@@ -1328,7 +1334,7 @@ type规则：支出→"expense"，收入→"income"
                     {"role": "system", "content": img_sys},
                     {"role": "user", "content": user_content},
                 ],
-                max_tokens=int(_cfg("max_tokens", "1024")) if str(event.user_id) == _get_owner_qq() else int(_cfg("max_tokens", "512")),
+                max_tokens=_cfg_int("max_tokens", 1024) if str(event.user_id) == _get_owner_qq() else _cfg_int("max_tokens", 512),
                 temperature=float(_cfg("temperature", "0.8")),
                 timeout=30.0
             )
