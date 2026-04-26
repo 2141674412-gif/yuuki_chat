@@ -1064,6 +1064,7 @@ async def handle_image_chat(event: MessageEvent):
         return
 
     # 截图记账去重：同一张图片不重复记账
+    _accounting_seen_key = None
     if _accounting_mode and img_files:
         uid = str(event.user_id)
         _accounting_seen = _get_accounting_seen()
@@ -1075,13 +1076,8 @@ async def handle_image_chat(event: MessageEvent):
             except Exception:
                 pass
             return
-        _accounting_seen[seen_key] = time.time()
-        # 只保留最近1000条
-        if len(_accounting_seen) > 1000:
-            oldest = sorted(_accounting_seen.items(), key=lambda x: x[1])[:500]
-            _accounting_seen.clear()
-            _accounting_seen.update(dict(oldest))
-        _save_accounting_seen()
+        # 先记住key，等确认是支付截图后再写入缓存
+        _accounting_seen_key = seen_key
 
     try:
         # 下载并处理所有图片
@@ -1262,6 +1258,14 @@ type规则：支出→"expense"，收入→"income"
 
                                         if saved_count > 0:
                                             _save_accounting(_accounting)
+                                            # 确认记账成功，写入去重缓存
+                                            if _accounting_seen_key:
+                                                _accounting_seen[_accounting_seen_key] = time.time()
+                                                if len(_accounting_seen) > 1000:
+                                                    oldest = sorted(_accounting_seen.items(), key=lambda x: x[1])[:500]
+                                                    _accounting_seen.clear()
+                                                    _accounting_seen.update(dict(oldest))
+                                                _save_accounting_seen()
                                             if saved_count == 1:
                                                 r = records[0] if records else {}
                                                 sign = "+" if r.get("type") == "income" else "-"
