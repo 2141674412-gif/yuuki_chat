@@ -443,10 +443,10 @@ async def _cmd_add_blacklist(event: MessageEvent):
     """拉黑用户（不回复任何消息）"""
     content = re.sub(r'^拉黑\s*', '', str(event.message).strip())
     if not content:
-        await event.finish("用法: /拉黑 QQ号")
+        await event.send("用法: /拉黑 QQ号")
     targets = re.findall(r'\d+', content)
     if not targets:
-        await event.finish("未找到有效的QQ号")
+        await event.send("未找到有效的QQ号")
     added = []
     for t in targets:
         if t not in CHAT_BLACKLIST:
@@ -465,18 +465,18 @@ async def _cmd_add_blacklist(event: MessageEvent):
                 _json.dump(list(CHAT_WHITELIST), f)
         except Exception:
             pass
-        await event.finish(f"已拉黑: {', '.join(added)}")
+        await event.send(f"已拉黑: {', '.join(added)}")
     else:
-        await event.finish("该用户已在黑名单中")
+        await event.send("该用户已在黑名单中")
 
 async def _cmd_del_blacklist(event: MessageEvent):
     """解除拉黑"""
     content = re.sub(r'^解除拉黑\s*', '', str(event.message).strip())
     if not content:
-        await event.finish("用法: /解除拉黑 QQ号")
+        await event.send("用法: /解除拉黑 QQ号")
     targets = re.findall(r'\d+', content)
     if not targets:
-        await event.finish("未找到有效的QQ号")
+        await event.send("未找到有效的QQ号")
     removed = []
     for t in targets:
         if t in CHAT_BLACKLIST:
@@ -488,18 +488,18 @@ async def _cmd_del_blacklist(event: MessageEvent):
                 _json.dump(list(CHAT_BLACKLIST), f)
         except Exception:
             pass
-        await event.finish(f"已解除拉黑: {', '.join(removed)}")
+        await event.send(f"已解除拉黑: {', '.join(removed)}")
     else:
-        await event.finish("该用户不在黑名单中")
+        await event.send("该用户不在黑名单中")
 
 async def _cmd_add_whitelist(event: MessageEvent):
     """加白名单（允许私聊）"""
     content = re.sub(r'^加白名单\s*', '', str(event.message).strip())
     if not content:
-        await event.finish("用法: /加白名单 QQ号")
+        await event.send("用法: /加白名单 QQ号")
     targets = re.findall(r'\d+', content)
     if not targets:
-        await event.finish("未找到有效的QQ号")
+        await event.send("未找到有效的QQ号")
     added = []
     for t in targets:
         if t not in CHAT_WHITELIST:
@@ -518,18 +518,18 @@ async def _cmd_add_whitelist(event: MessageEvent):
                 _json.dump(list(CHAT_BLACKLIST), f)
         except Exception:
             pass
-        await event.finish(f"已加白名单: {', '.join(added)}")
+        await event.send(f"已加白名单: {', '.join(added)}")
     else:
-        await event.finish("该用户已在白名单中")
+        await event.send("该用户已在白名单中")
 
 async def _cmd_del_whitelist(event: MessageEvent):
     """移除白名单"""
     content = re.sub(r'^删白名单\s*', '', str(event.message).strip())
     if not content:
-        await event.finish("用法: /删白名单 QQ号")
+        await event.send("用法: /删白名单 QQ号")
     targets = re.findall(r'\d+', content)
     if not targets:
-        await event.finish("未找到有效的QQ号")
+        await event.send("未找到有效的QQ号")
     removed = []
     for t in targets:
         if t in CHAT_WHITELIST:
@@ -541,23 +541,23 @@ async def _cmd_del_whitelist(event: MessageEvent):
                 _json.dump(list(CHAT_WHITELIST), f)
         except Exception:
             pass
-        await event.finish(f"已移除白名单: {', '.join(removed)}")
+        await event.send(f"已移除白名单: {', '.join(removed)}")
     else:
-        await event.finish("该用户不在白名单中")
+        await event.send("该用户不在白名单中")
 
 async def _cmd_show_blacklist(event: MessageEvent):
     """查看黑名单"""
     if CHAT_BLACKLIST:
-        await event.finish(f"黑名单({len(CHAT_BLACKLIST)}人): {', '.join(sorted(CHAT_BLACKLIST))}")
+        await event.send(f"黑名单({len(CHAT_BLACKLIST)}人): {', '.join(sorted(CHAT_BLACKLIST))}")
     else:
-        await event.finish("黑名单为空")
+        await event.send("黑名单为空")
 
 async def _cmd_show_whitelist(event: MessageEvent):
     """查看白名单"""
     if CHAT_WHITELIST:
-        await event.finish(f"白名单({len(CHAT_WHITELIST)}人): {', '.join(sorted(CHAT_WHITELIST))}")
+        await event.send(f"白名单({len(CHAT_WHITELIST)}人): {', '.join(sorted(CHAT_WHITELIST))}")
     else:
-        await event.finish("白名单为空")
+        await event.send("白名单为空")
 
 _register("拉黑", _cmd_add_blacklist, aliases=["blacklist"], admin_only=True)
 _register("解除拉黑", _cmd_del_blacklist, aliases=["unblacklist"], admin_only=True)

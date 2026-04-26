@@ -275,7 +275,7 @@ def _register(name, handler, aliases=None, priority=5, admin_only=False):
                 logger.debug(f"[命令] 群 {gid} 不在白名单，忽略")
                 return  # 不在白名单群里，静默忽略
         if admin_only and not check_superuser(str(event.user_id)):
-            await cmd.finish("...你不是管理员。")
+            await cmd.send("...你不是管理员。")
             return
         # 黑名单检查（管理员不受限）
         if not check_superuser(str(event.user_id)) and str(event.user_id) in user_blacklist:
