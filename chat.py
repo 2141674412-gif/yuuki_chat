@@ -265,6 +265,10 @@ async def handle_chat(event: MessageEvent):
     if any(seg.type == "forward" for seg in event.message):
         return
 
+    # 跳过B站链接（交给B站handler处理）
+    if re.search(r'bilibili\.com/video/|b23\.tv/', plain_text):
+        return
+
     # 记录群消息到 _group_chat_log（用于词云统计）
     if hasattr(event, 'group_id') and event.group_id:
         if event.group_id in ALLOWED_GROUPS and plain_text:
