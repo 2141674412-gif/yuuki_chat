@@ -57,6 +57,12 @@ _client_lock = threading.Lock()
 # ---- 全局 HTTP 客户端（连接池复用） ----
 from .utils import get_shared_http_client as _get_http_client
 
+# ---- 截图记账去重缓存 ----
+_accounting_seen_cache = {}
+
+def _get_accounting_seen():
+    return _accounting_seen_cache
+
 
 def _get_client() -> OpenAI:
     """获取 OpenAI 客户端单例，如果连接失败则重新创建。"""
@@ -755,6 +761,7 @@ async def handle_image_chat(event: MessageEvent):
     # 收集所有图片（最多5张）
     img_urls = []
     img_b64_list = []  # 直接的base64数据
+    img_files = []  # 用于去重
     for seg in event.message:
         if seg.type == "image":
             url = seg.data.get("url", "")
@@ -770,6 +777,8 @@ async def handle_image_chat(event: MessageEvent):
                 url = file
             if url:
                 img_urls.append(url)
+            if file:
+                img_files.append(file)
             if len(img_urls) + len(img_b64_list) >= _MAX_IMAGES:
                 break
 
@@ -779,6 +788,21 @@ async def handle_image_chat(event: MessageEvent):
             if seg.type == "image":
                 logger.warning(f"[图片理解] 图片segment数据: {seg.data}")
         return
+
+    # 截图记账去重：同一张图片不重复记账
+    if _accounting_mode and img_files:
+        uid = str(event.user_id)
+        _accounting_seen = _get_accounting_seen()
+        seen_key = f"{uid}:{img_files[0]}"
+        if seen_key in _accounting_seen:
+            logger.info(f"[截图记账] 跳过重复图片: {img_files[0]}")
+            return
+        _accounting_seen[seen_key] = time.time()
+        # 只保留最近1000条
+        if len(_accounting_seen) > 1000:
+            oldest = sorted(_accounting_seen.items(), key=lambda x: x[1])[:500]
+            _accounting_seen.clear()
+            _accounting_seen.update(dict(oldest))
 
     try:
         # 下载并处理所有图片
@@ -853,27 +877,16 @@ async def handle_image_chat(event: MessageEvent):
                     classify_result = classify_resp.choices[0].message.content.strip()
                     if "是" in classify_result and "否" not in classify_result:
                         # 是支付截图，进入记账模式
-                        _accounting_prompt = """请仔细观察这张图片，这是一张支付/收款/银行短信截图。请提取所有交易记录。
+                        _accounting_prompt = """请仔细观察这张图片，这是一张支付/收款/银行短信截图。
+请逐条提取交易记录，每条记录包含原始文本。
 
-如果只有一笔交易，回复：
-{"records": [{"amount": 金额数字, "category": "分类", "note": "备注", "type": "expense或income"}]}
+回复格式：
+{"records": [{"amount": 金额数字, "category": "分类", "note": "商户名或描述", "type": "expense或income", "raw": "原始短信文本"}]}
 
-如果有多笔交易，回复：
-{"records": [{"amount": 金额, "category": "分类", "note": "备注", "type": "类型"}, ...]}
-
-分类规则（选最匹配的）：
-餐饮、交通、购物、娱乐、住房、学习、医疗、收入、其他
-
-type规则：
-- 支出（付款/消费/花钱/转账支出）→ "expense"
-- 收入（收款/到账/退款/转入）→ "income"
-
-如果无法识别任何金额，回复：{"error": "无法识别"}
-
-规则：
-- 银行短信中"+"开头的是收入，"-"开头的是支出
-- 忽略0.01元以下的微小金额
-- 每条记录的note字段请写商户名或交易描述（如"达美乐比萨"、"饿了么"、"退款"等）"""
+分类规则：餐饮、交通、购物、娱乐、住房、学习、医疗、收入、其他
+type规则：支出→"expense"，收入→"income"
+规则：银行短信中"+"开头是收入，"-"开头是支出，忽略0.01元以下金额
+如果无法识别，回复：{"error": "无法识别"}"""
 
                         user_content = []
                         for img_b64 in images_b64:
@@ -907,16 +920,28 @@ type规则：
                                             records = [data]
 
                                         # 后处理：过滤余额
-                                        # 1. 去掉note含"余额"的记录
+                                        # 1. 从raw文本中提取所有余额值
+                                        balance_values = set()
+                                        for r in records:
+                                            raw = r.get("raw", "")
+                                            for m in re.finditer(r'余额[：:]?\s*([\d.]+)', raw):
+                                                try:
+                                                    balance_values.add(float(m.group(1)))
+                                                except ValueError:
+                                                    pass
+                                        # 2. 去掉amount等于某个余额值的记录
+                                        if balance_values:
+                                            records = [r for r in records if float(r.get("amount", 0)) not in balance_values]
+                                        # 3. 去掉note/category含"余额"的记录
                                         records = [r for r in records if "余额" not in r.get("note", "") and "余额" not in r.get("category", "")]
-                                        # 2. 如果有多条记录，去掉金额与其他记录完全相同的（余额常与某笔交易金额相同）
+                                        # 4. 多条记录中去除重复金额（余额常与交易金额相同）
                                         if len(records) > 1:
                                             seen_amounts = []
                                             filtered = []
                                             for r in records:
                                                 amt = float(r.get("amount", 0))
                                                 if amt in seen_amounts:
-                                                    continue  # 重复金额，可能是余额
+                                                    continue
                                                 seen_amounts.append(amt)
                                                 filtered.append(r)
                                             records = filtered
