@@ -171,30 +171,6 @@ if not ALLOWED_GROUPS:
     ALLOWED_GROUPS = [DEFAULT_GROUP]
 logger.info(f"[启动] allowed_groups={ALLOWED_GROUPS}")
 
-# ========== 个人黑白名单 ==========
-
-# 黑名单：这些用户bot完全不回复
-CHAT_BLACKLIST_FILE = os.path.join(_DATA_DIR, "chat_blacklist.json")
-CHAT_BLACKLIST = set()
-try:
-    if os.path.exists(CHAT_BLACKLIST_FILE):
-        with open(CHAT_BLACKLIST_FILE, "r", encoding="utf-8") as _f:
-            CHAT_BLACKLIST = set(json.load(_f))
-except Exception:
-    pass
-
-# 白名单：这些用户可以私聊bot（不受群限制）
-CHAT_WHITELIST_FILE = os.path.join(_DATA_DIR, "chat_whitelist.json")
-CHAT_WHITELIST = set()
-try:
-    if os.path.exists(CHAT_WHITELIST_FILE):
-        with open(CHAT_WHITELIST_FILE, "r", encoding="utf-8") as _f:
-            CHAT_WHITELIST = set(json.load(_f))
-except Exception:
-    pass
-
-logger.info(f"[启动] blacklist={CHAT_BLACKLIST}, whitelist={CHAT_WHITELIST}")
-
 # ========== 舞萌DX配置 ==========
 
 MAIMAI_API = "https://www.diving-fish.com/api/maimaidxprober/query/player"
@@ -218,6 +194,28 @@ MAIMAI_VERSIONS = [
 _DATA_DIR = os.path.join(os.getcwd(), "yuuki_data")
 os.makedirs(_DATA_DIR, exist_ok=True)
 DATA_DIR = _DATA_DIR
+
+# ========== 个人黑白名单 ==========
+
+CHAT_BLACKLIST_FILE = os.path.join(DATA_DIR, "chat_blacklist.json")
+CHAT_BLACKLIST = set()
+try:
+    if os.path.exists(CHAT_BLACKLIST_FILE):
+        with open(CHAT_BLACKLIST_FILE, "r", encoding="utf-8") as _f:
+            CHAT_BLACKLIST = set(json.load(_f))
+except Exception:
+    pass
+
+CHAT_WHITELIST_FILE = os.path.join(DATA_DIR, "chat_whitelist.json")
+CHAT_WHITELIST = set()
+try:
+    if os.path.exists(CHAT_WHITELIST_FILE):
+        with open(CHAT_WHITELIST_FILE, "r", encoding="utf-8") as _f:
+            CHAT_WHITELIST = set(json.load(_f))
+except Exception:
+    pass
+
+logger.info(f"[启动] blacklist={CHAT_BLACKLIST}, whitelist={CHAT_WHITELIST}")
 
 # 绑定数据文件路径
 MAIMAI_BINDS_FILE = os.path.join(DATA_DIR, "maimai_binds.json")
