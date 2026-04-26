@@ -320,6 +320,8 @@ async def _cmd_update(event: MessageEvent):
                 await bot.send_group_msg(group_id=event.group_id, message=Message(msg))
             else:
                 await bot.send_private_msg(user_id=int(user_id), message=Message(msg))
+        except FinishedException:
+            raise
         except Exception as e:
             logger.error(f"[更新] 发送消息失败: {e}")
 
@@ -419,6 +421,8 @@ async def _cmd_update(event: MessageEvent):
         if err:
             await _send(f"...更新成功但重启失败：{err}，请手动重启。")
 
+    except FinishedException:
+        raise
     except Exception as e:
         # 恢复备份
         _restore_backup()

@@ -143,7 +143,7 @@ def _check_code_bugs():
 
         # 6. 检查 _cmd_update_cmd.send / _cmd_update_cmd.finish（旧代码残留）
         for i, line in enumerate(lines, 1):
-            if "_send(event, " in line or "_send(event, " in line:
+            if "_cmd_" in line and (".send(" in line or ".finish(" in line):
                 bugs.append(f"❌ {fname} 第{i}行: 使用了旧的 _cmd_update_cmd.send/finish，应改用 bot 直接发送")
 
     return bugs

@@ -130,7 +130,7 @@ def _load_json(filepath: str) -> dict:
         return {}
 
 
-def _save_json(filepath: str, data: dict) -> None:
+def _save_json(filepath: str, data) -> None:
     """将数据保存到 JSON 文件（原子写入，防止崩溃损坏）。"""
     try:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -148,7 +148,7 @@ def _save_json(filepath: str, data: dict) -> None:
             except OSError:
                 pass
             raise
-    except OSError as e:
+    except Exception as e:
         logger.error(f"[commands] 保存文件失败 {filepath}: {e}")
 
 

@@ -124,6 +124,7 @@ async def _cmd_record(event: MessageEvent):
         records = _accounting.get(uid, [])
         if not records:
             await _send(event, "...记什么。格式：/记 午饭 25\n或：/记 +100 工资")
+            return
         # 显示最近5条
         lines = ["[最近记账]\n"]
         for r in records[-5:]:

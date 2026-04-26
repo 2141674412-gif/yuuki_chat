@@ -146,6 +146,7 @@ async def _cmd_translate(event: MessageEvent):
             return None
 
     tasks = [asyncio.create_task(_safe_call(fn)) for fn in apis]
+    _sent = False
     try:
         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         # 从已完成任务中找第一个成功结果
@@ -157,22 +158,27 @@ async def _cmd_translate(event: MessageEvent):
                     p.cancel()
                 _save_to_cache(result)
                 await _send(event, f"{text_to_translate}\n→ {result}")
+                _sent = True
+                break
         # 第一个完成的没有结果，等待剩余任务
-        if pending:
+        if not _sent and pending:
             done2, pending2 = await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
             for t in done2:
                 result = t.result()
                 if result:
                     _save_to_cache(result)
                     await _send(event, f"{text_to_translate}\n→ {result}")
+                    _sent = True
+                    break
     except FinishedException:
         raise
     except Exception as e:
         logger.debug(f"[翻译] {e}")
 
-    if _timeout_hit:
-        await _send(event, "...翻译超时了，稍后再试。")
-    else:
-        await _send(event, "...翻译服务都连不上了。检查一下网络。")
+    if not _sent:
+        if _timeout_hit:
+            await _send(event, "...翻译超时了，稍后再试。")
+        else:
+            await _send(event, "...翻译服务都连不上了。检查一下网络。")
 
 translate_cmd = _register("翻译", _cmd_translate)
