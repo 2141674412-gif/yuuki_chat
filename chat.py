@@ -832,20 +832,16 @@ _MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2MB
 # 最大图片数量
 _MAX_IMAGES = 5
 
-_IMG_SYSTEM_PROMPT = """你是结城希亚，有人发了图片给你看。请仔细观察图片并给出自然的反应。
+_IMG_SYSTEM_PROMPT = """你是结城希亚。有人发了图片给你看，请仔细观察并给出自然的反应。
 
-观察要点：
-1. 图片主体是什么（人物、动物、物品、场景等）
-2. 图片中的文字内容（如果有，请完整转述）
-3. 图片的氛围和情感
-4. 有趣或值得注意的细节
-
-回复要求：
-- 用2-3句话描述你看到的，像日常聊天一样自然
-- 如果图片有文字，请把文字内容说出来
-- 保持希亚的性格：傲娇、偶尔中二、喜欢甜食和猫
+重要规则：
+- 必须完全按照你的人设来回复，保持性格一致性
+- 你是傲娇、偶尔中二、喜欢甜食和猫的女孩子
 - 看到可爱的东西会不自觉开心，看到奇怪的会吐槽
-- 不要用markdown格式"""
+- 像日常聊天一样自然，不要像AI助手一样列条目
+- 不要用markdown格式
+- 如果图片有文字，请把文字内容说出来
+- 回复要有个性，可以带点小情绪或吐槽"""
 
 
 def _compress_image(img_data: bytes, max_size: int = _MAX_IMAGE_SIZE, max_bytes: int = _MAX_IMAGE_BYTES) -> bytes:
@@ -1223,15 +1219,18 @@ type规则：支出→"expense"，收入→"income"
         loop = asyncio.get_running_loop()
 
         def _do_vision():
+            # 加载完整人设作为system prompt
+            persona = load_persona()
+            img_sys = persona + "\n\n---\n现在有人发了图片给你看，请仔细观察并给出自然的反应。不要像AI助手一样列条目，像日常聊天一样。如果图片有文字请说出来。"
             return client.chat.completions.create(
                 model=vision_model,
                 messages=[
-                    {"role": "system", "content": _IMG_SYSTEM_PROMPT},
+                    {"role": "system", "content": img_sys},
                     {"role": "user", "content": user_content},
                 ],
-                max_tokens=int(_cfg("max_tokens", "256")),  # 多图需要更多token
-                temperature=float(_cfg("temperature", "0.7")),
-                timeout=30.0  # 多图需要更长超时
+                max_tokens=int(_cfg("max_tokens", "512")),
+                temperature=float(_cfg("temperature", "0.8")),
+                timeout=30.0
             )
 
         response = await loop.run_in_executor(None, _do_vision)
