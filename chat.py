@@ -800,10 +800,10 @@ async def handle_bilibili(event: MessageEvent):
 
         # 发送文字信息
         text_msg = (
-            f"🎬 {title}\n"
-            f"👤 {up_name}\n"
-            f"▶ {view}  👍 {like}  🪙 {coin}  ⭐ {fav}  💬 {danmaku}\n"
-            f"⏱ {m}:{s:02d}  🔗 https://bilibili.com/video/{bvid}"
+            f"{title}\n"
+            f"UP: {up_name}\n"
+            f"播放 {view}  点赞 {like}  投币 {coin}  收藏 {fav}  弹幕 {danmaku}\n"
+            f"时长 {m}:{s:02d}  https://bilibili.com/video/{bvid}"
         )
         await _bili_chat.send(text_msg)
 
