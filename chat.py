@@ -651,6 +651,102 @@ async def handle_qrcode(event: MessageEvent):
                 logger.warning(f"[二维码] 识别异常: {e}")
 
 
+# ========== B站视频卡片 ==========
+
+_bili_chat = on_message(priority=3, block=False)
+
+_BILI_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://www.bilibili.com",
+}
+
+def _extract_bili_url(text: str):
+    """从文本中提取B站视频BV号"""
+    m = re.search(r'BV[a-zA-Z0-9]+', text)
+    return m.group(0) if m else ""
+
+def _format_num(n):
+    if n is None:
+        return "-"
+    n = int(n)
+    if n >= 100000000:
+        return f"{n / 100000000:.1f}亿"
+    elif n >= 10000:
+        return f"{n / 10000:.1f}万"
+    return str(n)
+
+@_bili_chat.handle()
+async def handle_bilibili(event: MessageEvent):
+    """检测B站链接/卡片，发送视频信息"""
+    # 从所有segment中提取文本
+    full_text = ""
+    for seg in event.message:
+        if seg.type == "text":
+            full_text += seg.data.get("text", "")
+        elif seg.type == "json":
+            full_text += seg.data.get("data", "")
+
+    # 检测B站链接或BV号
+    if not re.search(r'bilibili\.com/video/|b23\.tv/|BV[a-zA-Z0-9]{6,}', full_text):
+        return
+
+    bvid = _extract_bili_url(full_text)
+    if not bvid:
+        return
+
+    logger.info(f"[B站] 检测到: {bvid}")
+
+    try:
+        client = _get_http_client()
+        resp = await client.get(
+            "https://api.bilibili.com/x/web-interface/view",
+            params={"bvid": bvid},
+            headers=_BILI_HEADERS,
+            timeout=5.0
+        )
+        data = resp.json()
+        if data.get("code") != 0:
+            logger.warning(f"[B站] API错误: {data.get('message')}")
+            return
+
+        info = data.get("data", {})
+        title = info.get("title", "未知")
+        pic = info.get("pic", "")
+        owner = info.get("owner", {})
+        up_name = owner.get("name", "未知")
+        stat = info.get("stat", {})
+        view = _format_num(stat.get("view"))
+        like = _format_num(stat.get("like"))
+        coin = _format_num(stat.get("coin"))
+        fav = _format_num(stat.get("favorite"))
+        danmaku = _format_num(stat.get("danmaku"))
+        duration = info.get("duration", 0)
+        m, s = divmod(duration, 60)
+
+        # 下载封面并发送
+        try:
+            resp2 = await client.get(pic, headers=_BILI_HEADERS, timeout=10.0)
+            if resp2.status_code == 200:
+                cover_b64 = base64.b64encode(resp2.content).decode()
+                msg = MessageSegment.image(f"base64://{cover_b64}")
+                await _bili_chat.send(msg)
+                await asyncio.sleep(0.3)
+        except Exception as e:
+            logger.debug(f"[B站] 封面下载失败: {e}")
+
+        # 发送文字信息
+        text_msg = (
+            f"🎬 {title}\n"
+            f"👤 {up_name}\n"
+            f"▶ {view}  👍 {like}  🪙 {coin}  ⭐ {fav}  💬 {danmaku}\n"
+            f"⏱ {m}:{s:02d}  🔗 https://bilibili.com/video/{bvid}"
+        )
+        await _bili_chat.send(text_msg)
+
+    except Exception as e:
+        logger.warning(f"[B站] 处理失败: {e}")
+
+
 # ========== 图片理解 ==========
 
 _img_chat = on_message(priority=4, block=False)
