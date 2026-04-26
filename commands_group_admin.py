@@ -12,10 +12,21 @@ from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent
 from .commands_base import check_superuser
 
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 async def _cmd_ban(event: MessageEvent, bot: Bot):
     """禁言：/禁言 @某人 [时长]"""
     if not isinstance(event, GroupMessageEvent):
-        await ban_cmd.send("...这个命令只能在群里用哦。")
+        await _send(event, "...这个命令只能在群里用哦。")
         return
     content = str(event.message).strip()
     for prefix in ["禁言"]:
@@ -30,7 +41,7 @@ async def _cmd_ban(event: MessageEvent, bot: Bot):
             target_uid = str(seg.data.get("qq", ""))
             break
     if not target_uid:
-        await ban_cmd.send("...要禁言谁？请 @ta。")
+        await _send(event, "...要禁言谁？请 @ta。")
         return
     # 解析时长
     duration = 30 * 60  # 默认30分钟
@@ -48,7 +59,7 @@ async def _cmd_ban(event: MessageEvent, bot: Bot):
     try:
         await bot.set_group_ban(group_id=event.group_id, user_id=int(target_uid), duration=duration)
         try:
-            await ban_cmd.send(f"已禁言 {duration // 60} 分钟~")
+            await _send(event, f"已禁言 {duration // 60} 分钟~")
         except FinishedException:
             raise
         except Exception:
@@ -57,12 +68,12 @@ async def _cmd_ban(event: MessageEvent, bot: Bot):
         raise
     except Exception as e:
         logger.error(f"[禁言] 失败: {e}")
-        await ban_cmd.send("...禁言失败了。")
+        await _send(event, "...禁言失败了。")
 
 async def _cmd_kick(event: MessageEvent, bot: Bot):
     """踢人：/踢 @某人"""
     if not isinstance(event, GroupMessageEvent):
-        await kick_cmd.send("...这个命令只能在群里用哦。")
+        await _send(event, "...这个命令只能在群里用哦。")
         return
     segments = event.message
     target_uid = None
@@ -71,14 +82,14 @@ async def _cmd_kick(event: MessageEvent, bot: Bot):
             target_uid = str(seg.data.get("qq", ""))
             break
     if not target_uid:
-        await kick_cmd.send("...要踢谁？请 @ta。")
+        await _send(event, "...要踢谁？请 @ta。")
         return
     try:
         ret = await bot.set_group_kick(group_id=event.group_id, user_id=int(target_uid))
         # 某些OneBot实现踢人后返回非预期结果，但实际成功
         logger.info(f"[踢] 成功: {target_uid}, ret={ret}")
         try:
-            await kick_cmd.send("已送走~")
+            await _send(event, "已送走~")
         except FinishedException:
             raise
         except Exception:
@@ -87,12 +98,12 @@ async def _cmd_kick(event: MessageEvent, bot: Bot):
         raise
     except Exception as e:
         logger.error(f"[踢] 失败: {e}")
-        await kick_cmd.send("...踢人失败了。")
+        await _send(event, "...踢人失败了。")
 
 async def _cmd_recall(event: MessageEvent, bot: Bot):
     """撤回 bot 发送的最后一条消息"""
     if not isinstance(event, GroupMessageEvent):
-        await recall_cmd.send("...这个命令只能在群里用哦。")
+        await _send(event, "...这个命令只能在群里用哦。")
         return
     try:
         # 获取最近的消息列表，找到 bot 发送的最后一条
@@ -102,12 +113,12 @@ async def _cmd_recall(event: MessageEvent, bot: Bot):
             mid = getattr(msg, "message_id", None)
             if uid and str(uid) == str(bot.self_id) and mid:
                 await bot.delete_msg(message_id=mid)
-                await recall_cmd.send("已撤回~")
+                await _send(event, "已撤回~")
                 return
-        await recall_cmd.send("...没有找到可以撤回的消息。")
+        await _send(event, "...没有找到可以撤回的消息。")
     except Exception as e:
         logger.error(f"[撤回] 失败: {e}")
-        await recall_cmd.send("...撤回失败了。")
+        await _send(event, "...撤回失败了。")
 
 # 群管命令需要 Bot 参数，手动注册
 _ban_cmd = on_command("禁言", priority=1)
@@ -118,7 +129,7 @@ async def _ban_handler(event: MessageEvent, bot: Bot):
     if gid and ALLOWED_GROUPS and gid not in ALLOWED_GROUPS:
         return
     if not check_superuser(str(event.user_id)):
-        await _ban_cmd.send("...你不是管理员。")
+        await _send(event, "...你不是管理员。")
         return
     await _cmd_ban(event, bot)
 
@@ -130,7 +141,7 @@ async def _kick_handler(event: MessageEvent, bot: Bot):
     if gid and ALLOWED_GROUPS and gid not in ALLOWED_GROUPS:
         return
     if not check_superuser(str(event.user_id)):
-        await _kick_cmd.send("...你不是管理员。")
+        await _send(event, "...你不是管理员。")
         return
     await _cmd_kick(event, bot)
 
@@ -142,7 +153,7 @@ async def _recall_handler(event: MessageEvent, bot: Bot):
     if gid and ALLOWED_GROUPS and gid not in ALLOWED_GROUPS:
         return
     if not check_superuser(str(event.user_id)):
-        await _recall_cmd.send("...你不是管理员。")
+        await _send(event, "...你不是管理员。")
         return
     await _cmd_recall(event, bot)
 
@@ -301,7 +312,7 @@ async def _cmd_set_welcome(event: MessageEvent):
             break
 
     if not content:
-        await _set_welcome_cmd.send(
+        await _send(event, 
             f"...当前欢迎语：{_welcome_msg}\n"
             f"状态：{'开启' if _welcome_enabled else '关闭'}\n"
             f"用法：/设置欢迎 欢迎内容（{{nickname}}代表新人昵称）\n"
@@ -311,11 +322,11 @@ async def _cmd_set_welcome(event: MessageEvent):
 
     if content in ("开启", "on"):
         _welcome_enabled = True
-        await _set_welcome_cmd.send("...自动欢迎已开启。")
+        await _send(event, "...自动欢迎已开启。")
         return
     if content in ("关闭", "off"):
         _welcome_enabled = False
-        await _set_welcome_cmd.send("...自动欢迎已关闭。")
+        await _send(event, "...自动欢迎已关闭。")
         return
 
     _welcome_msg = content
@@ -328,7 +339,7 @@ async def _cmd_set_welcome(event: MessageEvent):
             json.dump({"enabled": _welcome_enabled, "message": _welcome_msg}, f, ensure_ascii=False)
     except Exception:
         pass
-    await _set_welcome_cmd.send(f"...欢迎语已设置：{content}")
+    await _send(event, f"...欢迎语已设置：{content}")
 
 
 async def _cmd_add_filter(event: MessageEvent):
@@ -342,7 +353,7 @@ async def _cmd_add_filter(event: MessageEvent):
     if not content:
         status = "开启" if _filter_words else "关闭"
         words = "、".join(_filter_words[:10]) if _filter_words else "无"
-        await _add_filter_cmd.send(
+        await _send(event, 
             f"...关键词过滤：{status}（{_filter_action}）\n"
             f"当前词：{words}\n"
             f"用法：/加过滤 关键词\n"
@@ -362,7 +373,7 @@ async def _cmd_add_filter(event: MessageEvent):
             json.dump({"words": _filter_words, "action": _filter_action}, f, ensure_ascii=False)
     except Exception:
         pass
-    await _add_filter_cmd.send(f"...已添加过滤词：{content}（共{len(_filter_words)}个）")
+    await _send(event, f"...已添加过滤词：{content}（共{len(_filter_words)}个）")
 
 
 async def _cmd_del_filter(event: MessageEvent):
@@ -374,7 +385,7 @@ async def _cmd_del_filter(event: MessageEvent):
             break
 
     if not content:
-        await _del_filter_cmd.send("...删哪个？用法：/删过滤 关键词")
+        await _send(event, "...删哪个？用法：/删过滤 关键词")
         return
 
     if content in _filter_words:
@@ -387,7 +398,7 @@ async def _cmd_del_filter(event: MessageEvent):
             json.dump({"words": _filter_words, "action": _filter_action}, f, ensure_ascii=False)
     except Exception:
         pass
-    await _del_filter_cmd.send(f"...已删除过滤词：{content}（剩余{len(_filter_words)}个）")
+    await _send(event, f"...已删除过滤词：{content}（剩余{len(_filter_words)}个）")
 
 
 async def _cmd_filter_mode(event: MessageEvent):
@@ -400,7 +411,7 @@ async def _cmd_filter_mode(event: MessageEvent):
             break
 
     if not content:
-        await _filter_mode_cmd.send(
+        await _send(event, 
             f"...当前模式：{_filter_action}\n"
             f"warn=仅通知 | delete=撤回 | ban=撤回+禁言10分钟\n"
             f"用法：/过滤模式 warn/delete/ban"
@@ -418,9 +429,9 @@ async def _cmd_filter_mode(event: MessageEvent):
         except Exception:
             pass
         mode_names = {"warn": "仅通知", "delete": "撤回", "ban": "撤回+禁言"}
-        await _filter_mode_cmd.send(f"...过滤模式已设为：{mode_names.get(content, content)}")
+        await _send(event, f"...过滤模式已设为：{mode_names.get(content, content)}")
     else:
-        await _filter_mode_cmd.send("...无效模式，可选：warn/delete/ban")
+        await _send(event, "...无效模式，可选：warn/delete/ban")
 
 
 from .commands_base import _register

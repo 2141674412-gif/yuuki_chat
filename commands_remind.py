@@ -10,11 +10,22 @@ from .commands_base import _register, _save_reminders, reminders
 
 # -- 提醒 --
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 async def _cmd_remind(event: MessageEvent):
     content = str(event.message).replace("提醒", "").strip()
 
     if not content:
-        await remind_cmd.send("提醒你什么。说清楚。格式：/提醒 5分钟 写作业")
+        await _send(event, "提醒你什么。说清楚。格式：/提醒 5分钟 写作业")
 
     user_id = str(event.user_id)
     now = datetime.now()
@@ -28,7 +39,7 @@ async def _cmd_remind(event: MessageEvent):
         remind_content = content.replace(time_match.group(0), "").strip()
 
         if remind_time <= now:
-            await remind_cmd.send("时间已过，请设置未来的时间。")
+            await _send(event, "时间已过，请设置未来的时间。")
 
         if user_id not in reminders:
             reminders[user_id] = []
@@ -40,9 +51,9 @@ async def _cmd_remind(event: MessageEvent):
         })
         _save_reminders()
 
-        await remind_cmd.send(f"记住了。{remind_time.strftime('%H:%M')}提醒你{remind_content}。")
+        await _send(event, f"记住了。{remind_time.strftime('%H:%M')}提醒你{remind_content}。")
     else:
-        await remind_cmd.send("时间格式不对。比如：/提醒 5分钟 写作业")
+        await _send(event, "时间格式不对。比如：/提醒 5分钟 写作业")
 
 remind_cmd = _register("提醒", _cmd_remind)
 
@@ -52,15 +63,15 @@ async def _cmd_reminders(event: MessageEvent):
     user_id = str(event.user_id)
 
     if user_id not in reminders or not reminders[user_id]:
-        await reminders_cmd.send("你没什么提醒。")
+        await _send(event, "你没什么提醒。")
 
     now = datetime.now()
     active = [r for r in reminders[user_id] if r["time"] > now]
     if not active:
-        await reminders_cmd.send("你没什么提醒。")
+        await _send(event, "你没什么提醒。")
 
     lines = [f"{r['id']}. {r['content']} ({r['time'].strftime('%H:%M')})" for r in active]
-    await reminders_cmd.send("你的提醒：\n" + "\n".join(lines))
+    await _send(event, "你的提醒：\n" + "\n".join(lines))
 
 reminders_cmd = _register("历史", _cmd_reminders)
 
@@ -70,27 +81,27 @@ async def _cmd_cancel_remind(event: MessageEvent):
     remind_id_str = str(event.message).replace("取消提醒", "").strip()
 
     if not remind_id_str:
-        await cancel_remind_cmd.send("取消哪个。说序号。")
+        await _send(event, "取消哪个。说序号。")
 
     user_id = str(event.user_id)
 
     if user_id not in reminders or not reminders[user_id]:
-        await cancel_remind_cmd.send("你本来就没提醒。")
+        await _send(event, "你本来就没提醒。")
 
     try:
         remind_id = int(remind_id_str)
     except ValueError:
-        await cancel_remind_cmd.send("...序号格式不对。")
+        await _send(event, "...序号格式不对。")
         return
 
     for i, r in enumerate(reminders[user_id]):
         if r["id"] == remind_id:
             reminders[user_id].pop(i)
             _save_reminders()
-            await cancel_remind_cmd.send(f"取消了。{r['content']}。")
+            await _send(event, f"取消了。{r['content']}。")
             return
 
-    await cancel_remind_cmd.send("找不到这个提醒。")
+    await _send(event, "找不到这个提醒。")
 
 cancel_remind_cmd = _register("取消提醒", _cmd_cancel_remind)
 

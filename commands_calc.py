@@ -18,6 +18,17 @@ _SAFE_OPERATORS = {
 }
 
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 def _safe_eval_node(node: ast.AST) -> float:
     """递归求值 AST 节点，仅允许数字常量和白名单运算符。"""
     if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
@@ -53,24 +64,24 @@ async def _cmd_calc(event: MessageEvent):
     expr = str(event.message).replace("计算器", "").strip()
 
     if not expr:
-        await calc_cmd.send("...算什么。你倒是给我算式啊。")
+        await _send(event, "...算什么。你倒是给我算式啊。")
 
     if not re.match(r'^[\d+\-*/().\s^eE]+$', expr):
-        await calc_cmd.send("这个我算不了。太复杂了。")
+        await _send(event, "这个我算不了。太复杂了。")
         return
 
     try:
         result = safe_eval(expr)
         if isinstance(result, float) and result == int(result):
             result = int(result)
-        await calc_cmd.send(f"{result}。这种程度的问题...不需要正义的伙伴吧。")
+        await _send(event, f"{result}。这种程度的问题...不需要正义的伙伴吧。")
     except ZeroDivisionError:
-        await calc_cmd.send("...除以零了。你故意的吧。")
+        await _send(event, "...除以零了。你故意的吧。")
     except (ValueError, SyntaxError):
-        await calc_cmd.send("这个我算不了。太复杂了。")
+        await _send(event, "这个我算不了。太复杂了。")
     except FinishedException:
         raise
     except Exception:
-        await calc_cmd.send("...算错了。不怪我。")
+        await _send(event, "...算错了。不怪我。")
 
 calc_cmd = _register("计算器", _cmd_calc)

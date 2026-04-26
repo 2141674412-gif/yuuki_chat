@@ -18,6 +18,17 @@ from .commands_base import _register, check_superuser, _DATA_DIR, superusers
 BACKUP_DIR = os.path.join(_DATA_DIR, "backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 async def _do_backup(bot=None, group_id=None):
     """执行备份，返回备份文件路径或 None"""
     try:
@@ -65,14 +76,14 @@ def _cleanup_old_backups():
 async def _cmd_manual_backup(event: MessageEvent):
     """手动备份：/手动备份"""
     if not check_superuser(str(event.user_id)):
-        await manual_backup_cmd.send("...你不是管理员。")
+        await _send(event, "...你不是管理员。")
         return
-    await manual_backup_cmd.send("正在备份中...")
+    await _send(event, "正在备份中...")
     result = await _do_backup()
     if result:
-        await manual_backup_cmd.send(f"备份完成！文件：{os.path.basename(result)}")
+        await _send(event, f"备份完成！文件：{os.path.basename(result)}")
     else:
-        await manual_backup_cmd.send("...备份失败了，看看日志吧。")
+        await _send(event, "...备份失败了，看看日志吧。")
 
 manual_backup_cmd = _register("手动备份", _cmd_manual_backup, admin_only=True)
 
@@ -110,10 +121,10 @@ EXPORT_FILES = [
 async def _cmd_export(event: MessageEvent):
     """导出数据：/导出"""
     if not isinstance(event, GroupMessageEvent):
-        await export_cmd.send("...导出命令只能在群里用。")
+        await _send(event, "...导出命令只能在群里用。")
         return
     if not check_superuser(str(event.user_id)):
-        await export_cmd.send("...你不是管理员。")
+        await _send(event, "...你不是管理员。")
         return
     try:
         export_path = os.path.join(_DATA_DIR, "export_temp.zip")
@@ -130,21 +141,21 @@ async def _cmd_export(event: MessageEvent):
                 file=export_path,
                 name=f"yuuki_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
             )
-            await export_cmd.send("数据已导出~")
+            await _send(event, "数据已导出~")
         except Exception:
             # 如果群文件上传失败，尝试私聊发送
-            await export_cmd.send("...群文件上传失败，请尝试在私聊中使用。")
+            await _send(event, "...群文件上传失败，请尝试在私聊中使用。")
         finally:
             if os.path.exists(export_path):
                 os.remove(export_path)
     except Exception as e:
         logger.error(f"[导出] 失败: {e}")
-        await export_cmd.send(f"...导出失败了：{e}")
+        await _send(event, f"...导出失败了：{e}")
 
 async def _cmd_import(event: MessageEvent):
     """导入数据：/导入（需要上传zip文件）"""
     if not check_superuser(str(event.user_id)):
-        await import_cmd.send("...你不是管理员。")
+        await _send(event, "...你不是管理员。")
         return
     # 检查是否有文件
     file_seg = None
@@ -153,14 +164,14 @@ async def _cmd_import(event: MessageEvent):
             file_seg = seg
             break
     if not file_seg:
-        await import_cmd.send("...请附上要导入的 zip 文件。用法：/导入 + 上传文件")
+        await _send(event, "...请附上要导入的 zip 文件。用法：/导入 + 上传文件")
         return
     file_url = file_seg.data.get("url", "")
     file_name = file_seg.data.get("file", "") or file_seg.data.get("filename", "data.zip")
     if not file_url:
-        await import_cmd.send("...无法获取文件，请重试。")
+        await _send(event, "...无法获取文件，请重试。")
         return
-    await import_cmd.send(f"正在导入 {file_name}，这将覆盖现有数据...")
+    await _send(event, f"正在导入 {file_name}，这将覆盖现有数据...")
     try:
         from .utils import get_shared_http_client as _get_http_client
         client = _get_http_client()
@@ -177,7 +188,7 @@ async def _cmd_import(event: MessageEvent):
                 # Zip Slip 防护：检查所有文件名
                 for name in zf.namelist():
                     if name.startswith("/") or ".." in name.split("/") or ".." in name.split("\\"):
-                        await import_cmd.send("...zip 文件包含非法路径，拒绝导入。")
+                        await _send(event, "...zip 文件包含非法路径，拒绝导入。")
                         return
                 zf.extractall(tmpdir)
             # 复制文件
@@ -197,12 +208,12 @@ async def _cmd_import(event: MessageEvent):
             _load_blacklist()
             from .commands_schedule import _load_scheduled_tasks
             _load_scheduled_tasks()
-            await import_cmd.send(f"导入完成！已导入 {len(imported)} 个文件：{', '.join(imported)}")
+            await _send(event, f"导入完成！已导入 {len(imported)} 个文件：{', '.join(imported)}")
         else:
-            await import_cmd.send("...zip 中没有找到可导入的数据文件。")
+            await _send(event, "...zip 中没有找到可导入的数据文件。")
     except Exception as e:
         logger.error(f"[导入] 失败: {e}")
-        await import_cmd.send(f"...导入失败了：{e}")
+        await _send(event, f"...导入失败了：{e}")
 
 export_cmd = _register("导出", _cmd_export, admin_only=True)
 import_cmd = _register("导入", _cmd_import, admin_only=True)

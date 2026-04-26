@@ -262,6 +262,16 @@ def check_superuser(user_id: str) -> bool:
 def _register(name, handler, aliases=None, priority=5, admin_only=False):
     """注册命令，可选别名、优先级和管理员限制。返回 matcher 对象。"""
     cmd = on_command(name, priority=priority)
+
+    async def _send_msg(event: MessageEvent, msg):
+        """发送消息的辅助函数"""
+        from nonebot import get_bot
+        bot = get_bot()
+        if hasattr(event, 'group_id'):
+            await bot.send_group_msg(group_id=event.group_id, message=msg)
+        else:
+            await bot.send_private_msg(user_id=event.user_id, message=msg)
+
     # 安全检查函数（主命令和别名共用）
     async def _safe_handler(event: MessageEvent):
         # 群白名单检查（默认不允许任何群，必须手动添加）
@@ -275,7 +285,7 @@ def _register(name, handler, aliases=None, priority=5, admin_only=False):
                 logger.debug(f"[命令] 群 {gid} 不在白名单，忽略")
                 return  # 不在白名单群里，静默忽略
         if admin_only and not check_superuser(str(event.user_id)):
-            await cmd.send("...你不是管理员。")
+            await _send_msg(event, "...你不是管理员。")
             return
         # 黑名单检查（管理员不受限）
         if not check_superuser(str(event.user_id)) and str(event.user_id) in user_blacklist:

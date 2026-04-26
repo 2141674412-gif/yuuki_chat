@@ -16,6 +16,17 @@ import asyncio
 
 # ─────────────────────────────────────────────────────────────
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 def _check_code_bugs():
     """静态代码检查：检测常见的bug模式"""
     bugs = []
@@ -132,7 +143,7 @@ def _check_code_bugs():
 
         # 6. 检查 _cmd_update_cmd.send / _cmd_update_cmd.finish（旧代码残留）
         for i, line in enumerate(lines, 1):
-            if "_cmd_update_cmd.send(" in line or "_cmd_update_cmd.send(" in line:
+            if "_send(event, " in line or "_send(event, " in line:
                 bugs.append(f"❌ {fname} 第{i}行: 使用了旧的 _cmd_update_cmd.send/finish，应改用 bot 直接发送")
 
     return bugs
@@ -141,7 +152,7 @@ def _check_code_bugs():
 async def _cmd_diagnose(event: MessageEvent):
     """自检诊断：检查bot运行环境和常见问题"""
     if not check_superuser(str(event.user_id)):
-        await diagnose_cmd.send("...你不是管理员。")
+        await _send(event, "...你不是管理员。")
         return
 
     issues = []
@@ -319,7 +330,7 @@ async def _cmd_diagnose(event: MessageEvent):
         msg += f"AI {'✅' if ai_ok else '❌'} | "
         msg += f"天气 {'✅' if weather_ok else '❌'} | "
         msg += f"群 {group_info}"
-        await diagnose_cmd.send(msg)
+        await _send(event, msg)
         return
 
     # 有问题，显示详细报告
@@ -394,9 +405,9 @@ async def _cmd_diagnose(event: MessageEvent):
 
     for i, page in enumerate(pages):
         if i == 0:
-            await diagnose_cmd.send(page)
+            await _send(event, page)
         else:
-            await diagnose_cmd.send(page)
+            await _send(event, page)
             await asyncio.sleep(0.3)
 
 
@@ -453,11 +464,11 @@ async def _cmd_status(event: MessageEvent):
 
         status.append(f"群: {len(ALLOWED_GROUPS)}")
 
-        await status_cmd.send("\n".join(status))
+        await _send(event, "\n".join(status))
     except FinishedException:
         raise
     except Exception as e:
-        await status_cmd.send(f"状态检查失败: {e}")
+        await _send(event, f"状态检查失败: {e}")
 
 
 status_cmd = _register("状态", _cmd_status, priority=1)

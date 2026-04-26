@@ -15,6 +15,17 @@ _translate_cache = {}  # {f"{text}|{lang}": {"result": str, "time": float}}
 _TRANSLATE_TTL = 300  # 5分钟
 
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 async def _translate_api1(text, target_lang):
     """Google翻译（非官方API）"""
     client = _get_http_client()
@@ -85,7 +96,7 @@ async def _cmd_translate(event: MessageEvent):
     content = str(event.message).replace("翻译", "", 1).strip().lstrip("/").strip()
 
     if not content:
-        await translate_cmd.send("翻译什么。说清楚。格式：/翻译 内容\n或 /翻译 en 内容")
+        await _send(event, "翻译什么。说清楚。格式：/翻译 内容\n或 /翻译 en 内容")
 
     target_lang = "en"
     text_to_translate = content
@@ -105,7 +116,7 @@ async def _cmd_translate(event: MessageEvent):
     if _cache_key in _translate_cache:
         _cached = _translate_cache[_cache_key]
         if time.time() - _cached["time"] < _TRANSLATE_TTL:
-            await translate_cmd.send(f"{text_to_translate}\n→ {_cached['result']}（缓存）")
+            await _send(event, f"{text_to_translate}\n→ {_cached['result']}（缓存）")
 
     apis = [_translate_api1, _translate_api2, _translate_api3]
 
@@ -143,7 +154,7 @@ async def _cmd_translate(event: MessageEvent):
                 for p in pending:
                     p.cancel()
                 _save_to_cache(result)
-                await translate_cmd.send(f"{text_to_translate}\n→ {result}")
+                await _send(event, f"{text_to_translate}\n→ {result}")
         # 第一个完成的没有结果，等待剩余任务
         if pending:
             done2, pending2 = await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
@@ -151,15 +162,15 @@ async def _cmd_translate(event: MessageEvent):
                 result = t.result()
                 if result:
                     _save_to_cache(result)
-                    await translate_cmd.send(f"{text_to_translate}\n→ {result}")
+                    await _send(event, f"{text_to_translate}\n→ {result}")
     except FinishedException:
         raise
     except Exception as e:
         logger.debug(f"[翻译] {e}")
 
     if _timeout_hit:
-        await translate_cmd.send("...翻译超时了，稍后再试。")
+        await _send(event, "...翻译超时了，稍后再试。")
     else:
-        await translate_cmd.send("...翻译服务都连不上了。检查一下网络。")
+        await _send(event, "...翻译服务都连不上了。检查一下网络。")
 
 translate_cmd = _register("翻译", _cmd_translate)

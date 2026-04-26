@@ -15,6 +15,17 @@ _search_cache: dict = {}
 _SEARCH_TTL = 300
 
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 def _clean_html(text: str) -> str:
     """清理HTML标签和实体"""
     text = re.sub(r'<[^>]+>', '', text)
@@ -281,7 +292,7 @@ async def _cmd_search(event: MessageEvent):
             content = content[len(prefix):].strip()
             break
     if not content:
-        await search_cmd.send("...搜什么。格式：/搜索 关键词")
+        await _send(event, "...搜什么。格式：/搜索 关键词")
         return
 
     # 检查缓存
@@ -289,9 +300,9 @@ async def _cmd_search(event: MessageEvent):
     if cache_key in _search_cache:
         cached = _search_cache[cache_key]
         if time.time() - cached["time"] < _SEARCH_TTL:
-            await search_cmd.send(cached["text"])
+            await _send(event, cached["text"])
 
-    await search_cmd.send("正在搜索中...")
+    await _send(event, "正在搜索中...")
 
     # 并行请求所有搜索 API
     async def _safe_search(fn, q):
@@ -324,9 +335,9 @@ async def _cmd_search(event: MessageEvent):
             if len(_search_cache) > 50:
                 oldest = min(_search_cache, key=lambda k: _search_cache[k]["time"])
                 del _search_cache[oldest]
-            await search_cmd.send(text)
+            await _send(event, text)
 
-    await search_cmd.send(f"...没搜到「{content}」的相关结果。换个关键词试试？")
+    await _send(event, f"...没搜到「{content}」的相关结果。换个关键词试试？")
 
 
 async def _cmd_image_search(event: MessageEvent):
@@ -337,14 +348,14 @@ async def _cmd_image_search(event: MessageEvent):
             content = content[len(prefix):].strip()
             break
     if not content:
-        await img_search_cmd.send("...搜什么图。格式：/搜图 关键词")
+        await _send(event, "...搜什么图。格式：/搜图 关键词")
         return
 
-    await img_search_cmd.send("正在搜图中...")
+    await _send(event, "正在搜图中...")
 
     images = await _search_images(content, count=3)
     if not images:
-        await img_search_cmd.send(f"...没搜到「{content}」的图片。换个关键词试试？")
+        await _send(event, f"...没搜到「{content}」的图片。换个关键词试试？")
 
     msg = MessageSegment.text(f"🖼️ 「{content}」的搜索结果：\n")
     for i, url in enumerate(images):
@@ -352,7 +363,7 @@ async def _cmd_image_search(event: MessageEvent):
         if i < len(images) - 1:
             msg += MessageSegment.text("\n")
 
-    await img_search_cmd.send(msg)
+    await _send(event, msg)
 
 
 search_cmd = _register("搜索", _cmd_search, aliases=["搜一下", "查一查"])

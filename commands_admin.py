@@ -18,8 +18,19 @@ from .chat import chat_history
 
 # ========== 查看当前人设 ==========
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 async def _cmd_view_persona(event: MessageEvent):
-    await view_persona_cmd.send(f"当前人设：\n{load_persona()}")
+    await _send(event, f"当前人设：\n{load_persona()}")
 
 view_persona_cmd = _register("查看人设", _cmd_view_persona, priority=1, admin_only=True)
 
@@ -29,7 +40,7 @@ async def _cmd_set_persona(event: MessageEvent):
     new_persona = str(event.message).replace("修改人设", "").strip()
 
     if not new_persona:
-        await set_persona_cmd.send("...内容呢。格式：/修改人设 [内容]")
+        await _send(event, "...内容呢。格式：/修改人设 [内容]")
 
     try:
         save_persona(new_persona)
@@ -39,9 +50,9 @@ async def _cmd_set_persona(event: MessageEvent):
                 chat_history[uid][0] = new_system
             else:
                 chat_history[uid].insert(0, new_system)
-        await set_persona_cmd.send("...知道了。人设已更新。")
+        await _send(event, "...知道了。人设已更新。")
     except OSError as e:
-        await set_persona_cmd.send(f"保存人设失败：{str(e)}")
+        await _send(event, f"保存人设失败：{str(e)}")
 
 set_persona_cmd = _register("修改人设", _cmd_set_persona, priority=1, admin_only=True)
 
@@ -52,11 +63,11 @@ async def _cmd_reset_persona(event: MessageEvent):
         if os.path.exists(PERSONA_FILE):
             os.remove(PERSONA_FILE)
     except OSError as e:
-        await reset_persona_cmd.send(f"删除人设文件失败：{str(e)}")
+        await _send(event, f"删除人设文件失败：{str(e)}")
         return
 
     chat_history.clear()
-    await reset_persona_cmd.send("人设已重置。")
+    await _send(event, "人设已重置。")
 
 reset_persona_cmd = _register("重置人设", _cmd_reset_persona, priority=1, admin_only=True)
 
@@ -78,7 +89,7 @@ async def _cmd_restart(event: MessageEvent):
         with open(restart_file, 'w', encoding='utf-8') as f:
             json.dump(restart_data, f)
     except OSError as e:
-        await restart_cmd.send(f"写入重启标记失败：{str(e)}")
+        await _send(event, f"写入重启标记失败：{str(e)}")
         return
 
     try:
@@ -92,7 +103,7 @@ async def _cmd_restart(event: MessageEvent):
         sys.stderr.flush()
         sys.exit(0)
     except OSError as e:
-        await restart_cmd.send(f"重启失败：{str(e)}")
+        await _send(event, f"重启失败：{str(e)}")
 
 restart_cmd = _register("重启", _cmd_restart, priority=1, admin_only=True)
 
@@ -142,16 +153,16 @@ async def _cmd_add_group(event: MessageEvent):
             content = content[len(prefix):].strip()
             break
     if not content:
-        await add_group_cmd.send("...群号呢。格式：/加群 群号")
+        await _send(event, "...群号呢。格式：/加群 群号")
         return
     try:
         gid = int(content)
     except ValueError:
-        await add_group_cmd.send("...群号格式不对。")
+        await _send(event, "...群号格式不对。")
         return
     groups = _load_allowed_groups()
     if gid in groups:
-        await add_group_cmd.send(f"群 {gid} 已经在白名单里了。")
+        await _send(event, f"群 {gid} 已经在白名单里了。")
         return
     groups.append(gid)
     _save_allowed_groups(groups)
@@ -159,7 +170,7 @@ async def _cmd_add_group(event: MessageEvent):
     from .config import ALLOWED_GROUPS
     ALLOWED_GROUPS.clear()
     ALLOWED_GROUPS.extend(groups)
-    await add_group_cmd.send(f"[OK] 已添加群 {gid} 到白名单。当前白名单：{groups}")
+    await _send(event, f"[OK] 已添加群 {gid} 到白名单。当前白名单：{groups}")
 
 
 async def _cmd_remove_group(event: MessageEvent):
@@ -172,23 +183,23 @@ async def _cmd_remove_group(event: MessageEvent):
             content = content[len(prefix):].strip()
             break
     if not content:
-        await remove_group_cmd.send("...群号呢。格式：/移群 群号")
+        await _send(event, "...群号呢。格式：/移群 群号")
         return
     try:
         gid = int(content)
     except ValueError:
-        await remove_group_cmd.send("...群号格式不对。")
+        await _send(event, "...群号格式不对。")
         return
     groups = _load_allowed_groups()
     if gid not in groups:
-        await remove_group_cmd.send(f"群 {gid} 不在白名单里。")
+        await _send(event, f"群 {gid} 不在白名单里。")
         return
     groups.remove(gid)
     _save_allowed_groups(groups)
     from .config import ALLOWED_GROUPS
     ALLOWED_GROUPS.clear()
     ALLOWED_GROUPS.extend(groups)
-    await remove_group_cmd.send(f"[OK] 已从白名单移除群 {gid}。当前白名单：{groups}")
+    await _send(event, f"[OK] 已从白名单移除群 {gid}。当前白名单：{groups}")
 
 
 async def _cmd_list_groups(event: MessageEvent):
@@ -197,12 +208,12 @@ async def _cmd_list_groups(event: MessageEvent):
         return
     groups = _load_allowed_groups()
     if not groups:
-        await list_groups_cmd.send("当前没有设置白名单，仅默认群可用。用 /加群 <群号> 添加。")
+        await _send(event, "当前没有设置白名单，仅默认群可用。用 /加群 <群号> 添加。")
         return
     msg = "当前白名单群：\n"
     for i, gid in enumerate(groups, 1):
         msg += f"{i}. {gid}\n"
-    await list_groups_cmd.send(msg.strip())
+    await _send(event, msg.strip())
 
 
 add_group_cmd = _register("加群", _cmd_add_group, priority=1, admin_only=True)
@@ -232,15 +243,15 @@ async def _cmd_blacklist_add(event: MessageEvent):
             target_id = m.group()
 
     if not target_id:
-        await blacklist_add_cmd.send("...要拉黑谁？@Ta 或发QQ号。")
+        await _send(event, "...要拉黑谁？@Ta 或发QQ号。")
         return
     if check_superuser(target_id):
-        await blacklist_add_cmd.send("...不能拉黑管理员。")
+        await _send(event, "...不能拉黑管理员。")
         return
 
     user_blacklist.add(target_id)
     _save_blacklist()
-    await blacklist_add_cmd.send(f"[OK] 已拉黑 {target_id}")
+    await _send(event, f"[OK] 已拉黑 {target_id}")
 
 blacklist_add_cmd = _register("拉黑", _cmd_blacklist_add, aliases=["加黑"], priority=1, admin_only=True)
 
@@ -264,27 +275,27 @@ async def _cmd_blacklist_remove(event: MessageEvent):
             target_id = m.group()
 
     if not target_id:
-        await blacklist_remove_cmd.send("...要解黑谁？@Ta 或发QQ号。")
+        await _send(event, "...要解黑谁？@Ta 或发QQ号。")
         return
 
     if target_id in user_blacklist:
         user_blacklist.discard(target_id)
         _save_blacklist()
-        await blacklist_remove_cmd.send(f"[OK] 已解除拉黑 {target_id}")
+        await _send(event, f"[OK] 已解除拉黑 {target_id}")
     else:
-        await blacklist_remove_cmd.send(f"{target_id} 不在黑名单里。")
+        await _send(event, f"{target_id} 不在黑名单里。")
 
 blacklist_remove_cmd = _register("解黑", _cmd_blacklist_remove, aliases=["移黑"], priority=1, admin_only=True)
 
 async def _cmd_blacklist_list(event: MessageEvent):
     """查看黑名单：/黑名单"""
     if not user_blacklist:
-        await blacklist_list_cmd.send("黑名单为空。")
+        await _send(event, "黑名单为空。")
         return
     msg = f"黑名单（{len(user_blacklist)}人）\n"
     for uid in sorted(user_blacklist):
         msg += f"  {uid}\n"
-    await blacklist_list_cmd.send(msg.strip())
+    await _send(event, msg.strip())
 
 blacklist_list_cmd = _register("黑名单", _cmd_blacklist_list, priority=1, admin_only=True)
 
@@ -294,6 +305,6 @@ async def _cmd_migrate_data(event: MessageEvent):
     """手动迁移数据到新路径"""
     from .commands_base import _migrate_data
     _migrate_data()
-    await migrate_cmd.send(f"[OK] 数据迁移完成。\n当前数据目录: {_DATA_DIR}\n文件列表: {os.listdir(_DATA_DIR)}")
+    await _send(event, f"[OK] 数据迁移完成。\n当前数据目录: {_DATA_DIR}\n文件列表: {os.listdir(_DATA_DIR)}")
 
 migrate_cmd = _register("迁移数据", _cmd_migrate_data, priority=1, admin_only=True)

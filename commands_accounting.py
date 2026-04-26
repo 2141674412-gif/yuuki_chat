@@ -19,6 +19,17 @@ try:
 except ImportError:
     _accounting_balance = {}
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 def _fmt_amount(amt):
     """格式化金额：整数不显示小数，小数显示2位"""
     if amt == int(amt):
@@ -112,21 +123,21 @@ async def _cmd_record(event: MessageEvent):
         uid = str(event.user_id)
         records = _accounting.get(uid, [])
         if not records:
-            await record_cmd.send("...记什么。格式：/记 午饭 25\n或：/记 +100 工资")
+            await _send(event, "...记什么。格式：/记 午饭 25\n或：/记 +100 工资")
         # 显示最近5条
         lines = ["📋 最近记账：\n"]
         for r in records[-5:]:
             icon = "📥" if r["type"] == "income" else "📤"
             lines.append(f"{icon} {r['date']} {r['category']} {r['note']} {'+' if r['type']=='income' else '-'}{r['amount']:.0f}")
         lines.append(f"\n共 {len(records)} 条记录")
-        await record_cmd.send("\n".join(lines))
+        await _send(event, "\n".join(lines))
         return
 
     uid = str(event.user_id)
     amount, remaining = _parse_amount(content)
 
     if amount is None:
-        await record_cmd.send("...金额呢。格式：/记 午饭 25")
+        await _send(event, "...金额呢。格式：/记 午饭 25")
         return
 
     record_type = _detect_type(content)
@@ -152,7 +163,7 @@ async def _cmd_record(event: MessageEvent):
     _save_accounting(_accounting)
 
     icon = "📥" if record_type == "income" else "📤"
-    await record_cmd.send(f"{icon} 已记录：{category} {note} {'+' if record_type=='income' else '-'}{_fmt_amount(amount)}")
+    await _send(event, f"{icon} 已记录：{category} {note} {'+' if record_type=='income' else '-'}{_fmt_amount(amount)}")
 
 
 async def _cmd_bill(event: MessageEvent):
@@ -166,7 +177,7 @@ async def _cmd_bill(event: MessageEvent):
     uid = str(event.user_id)
     records = _accounting.get(uid, [])
     if not records:
-        await bill_cmd.send("...还没有记账记录。")
+        await _send(event, "...还没有记账记录。")
         return
 
     now = datetime.now()
@@ -184,7 +195,7 @@ async def _cmd_bill(event: MessageEvent):
         filtered = [r for r in records if r["date"].startswith(month_prefix)]
 
     if not filtered:
-        await bill_cmd.send("...这个时间段没有记录。")
+        await _send(event, "...这个时间段没有记录。")
 
     # 按分类汇总
     expense_by_cat = {}
@@ -252,7 +263,7 @@ async def _cmd_bill(event: MessageEvent):
             sign = "+" if r["type"] == "income" else "-"
             lines.append(f"{r['date']} {icon}{r['note']} {sign}{r['amount']:.0f}")
 
-    await bill_cmd.send("\n".join(lines))
+    await _send(event, "\n".join(lines))
 
 
 async def _cmd_stats(event: MessageEvent):
@@ -266,7 +277,7 @@ async def _cmd_stats(event: MessageEvent):
     uid = str(event.user_id)
     records = _accounting.get(uid, [])
     if not records:
-        await stats_cmd.send("...还没有记账记录。")
+        await _send(event, "...还没有记账记录。")
         return
 
     now = datetime.now()
@@ -278,7 +289,7 @@ async def _cmd_stats(event: MessageEvent):
         filtered = records
 
     if not filtered:
-        await stats_cmd.send("...这个月还没有记录。")
+        await _send(event, "...这个月还没有记录。")
 
     # 计算日均
     total_expense = sum(r["amount"] for r in filtered if r["type"] == "expense")
@@ -315,7 +326,7 @@ async def _cmd_stats(event: MessageEvent):
         lines.append(f"最大单笔: {max_expense['category']} {max_expense['note']} -{max_expense['amount']:.0f}")
     lines.append(f"最常消费: {top_cat}（{cat_count.get(top_cat, 0)}笔）")
 
-    await stats_cmd.send("\n".join(lines))
+    await _send(event, "\n".join(lines))
 
 
 async def _cmd_clear_records(event: MessageEvent):
@@ -325,9 +336,9 @@ async def _cmd_clear_records(event: MessageEvent):
         count = len(_accounting[uid])
         del _accounting[uid]
         _save_accounting(_accounting)
-        await clear_cmd.send(f"...已清空 {count} 条记账记录。")
+        await _send(event, f"...已清空 {count} 条记账记录。")
     else:
-        await clear_cmd.send("...你本来就没有记录。")
+        await _send(event, "...你本来就没有记录。")
 
 
 record_cmd = _register("记", _cmd_record, aliases=["记账", "记录"])

@@ -24,6 +24,17 @@ _WEATHER_BINDS_FILE = os.path.join(_DATA_DIR, "weather_binds.json")
 _WEATHER_USER_FILE = os.path.join(_DATA_DIR, "weather_user_binds.json")
 # 个人绑定: {user_id: {"city": "上海"}}
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 def _load_weather_binds() -> dict:
     return _load_json(_WEATHER_BINDS_FILE) or {}
 
@@ -127,7 +138,7 @@ async def _cmd_weather(event: MessageEvent):
         user_id = str(event.user_id)
         city = _get_user_weather_city(user_id)
         if not city:
-            await weather_cmd.send(
+            await _send(event, 
                 "...要查哪个城市的天气？\n"
                 "用法：/天气 深圳\n"
                 "      /天气 广东深圳（同名城市加省份区分）\n"
@@ -141,7 +152,7 @@ async def _cmd_weather(event: MessageEvent):
     if city in _weather_cache:
         _cached = _weather_cache[city]
         if time.time() - _cached["time"] < _WEATHER_TTL:
-            await weather_cmd.send(_cached["text"])
+            await _send(event, _cached["text"])
             return
 
     try:
@@ -153,17 +164,17 @@ async def _cmd_weather(event: MessageEvent):
             oldest = min(_weather_cache, key=lambda k: _weather_cache[k]["time"])
             del _weather_cache[oldest]
         _weather_cache[city] = {"text": weather_text, "time": time.time()}
-        await weather_cmd.send(weather_text)
+        await _send(event, weather_text)
     except FinishedException:
         raise
     except httpx.TimeoutException:
-        await weather_cmd.send("...天气查询超时了，换个时间试试。")
+        await _send(event, "...天气查询超时了，换个时间试试。")
     except httpx.HTTPStatusError as e:
         logger.error(f"[天气] HTTP错误: {e.response.status_code}")
-        await weather_cmd.send(f"...天气服务返回错误（HTTP {e.response.status_code}），换个城市名试试。")
+        await _send(event, f"...天气服务返回错误（HTTP {e.response.status_code}），换个城市名试试。")
     except Exception as e:
         logger.error(f"[天气] 查询失败: {e}")
-        await weather_cmd.send(f"...天气查询失败了：{type(e).__name__}，稍后再试。")
+        await _send(event, f"...天气查询失败了：{type(e).__name__}，稍后再试。")
 
 
 async def _cmd_weather_bind(event: MessageEvent):
@@ -178,20 +189,20 @@ async def _cmd_weather_bind(event: MessageEvent):
 
     gid = str(getattr(event, 'group_id', 0))
     if not gid:
-        await weather_bind_cmd.send("...只能在群里绑定天气。")
+        await _send(event, "...只能在群里绑定天气。")
         return
 
     if not content:
         bind = _weather_binds.get(gid)
         if bind:
             h, m = bind.get("hour", 8), bind.get("minute", 0)
-            await weather_bind_cmd.send(
+            await _send(event, 
                 f"...当前绑定：{bind['city']}，每天{h:02d}:{m:02d}播报\n"
                 f"用法：/绑定天气 城市 时间（如：/绑定天气 北京 8:00）\n"
                 f"      /解绑天气"
             )
         else:
-            await weather_bind_cmd.send(
+            await _send(event, 
                 "...未绑定天气。\n"
                 f"用法：/绑定天气 城市 时间（如：/绑定天气 北京 8:00）"
             )
@@ -209,9 +220,9 @@ async def _cmd_weather_bind(event: MessageEvent):
                 pass
             del _weather_binds[gid]
             _save_weather_binds(_weather_binds)
-            await weather_bind_cmd.send("...已解绑天气播报。")
+            await _send(event, "...已解绑天气播报。")
         else:
-            await weather_bind_cmd.send("...当前没有绑定天气。")
+            await _send(event, "...当前没有绑定天气。")
         return
 
     # 解析：城市 [时间]
@@ -234,7 +245,7 @@ async def _cmd_weather_bind(event: MessageEvent):
                 pass
 
     if not (0 <= hour <= 23 and 0 <= minute <= 59):
-        await weather_bind_cmd.send("...时间格式不对，用 HH:MM 格式，如 8:00")
+        await _send(event, "...时间格式不对，用 HH:MM 格式，如 8:00")
         return
 
     # 保存绑定
@@ -257,7 +268,7 @@ async def _cmd_weather_bind(event: MessageEvent):
     except Exception as e:
         logger.warning(f"[天气] 注册定时任务失败: {e}")
 
-    await weather_bind_cmd.send(f"...已绑定：{city}，每天{hour:02d}:{minute:02d}播报天气。")
+    await _send(event, f"...已绑定：{city}，每天{hour:02d}:{minute:02d}播报天气。")
 
 
 async def _cmd_weather_unbind(event: MessageEvent):
@@ -279,9 +290,9 @@ async def _cmd_weather_unbind(event: MessageEvent):
             pass
         del _weather_binds[gid]
         _save_weather_binds(_weather_binds)
-        await weather_unbind_cmd.send("...已解绑天气播报。")
+        await _send(event, "...已解绑天气播报。")
     else:
-        await weather_unbind_cmd.send("...当前没有绑定天气。")
+        await _send(event, "...当前没有绑定天气。")
 
 
 async def _send_weather_report(group_id: str):
@@ -360,24 +371,24 @@ async def _cmd_my_weather(event: MessageEvent):
     if not content:
         city = _get_user_weather_city(user_id)
         if city:
-            await my_weather_cmd.send(f"...你绑定的城市是：{city}\n用法：/我的天气 城市（重新绑定）\n      /我的天气 取消")
+            await _send(event, f"...你绑定的城市是：{city}\n用法：/我的天气 城市（重新绑定）\n      /我的天气 取消")
         else:
-            await my_weather_cmd.send("...你还没绑定天气城市。\n用法：/我的天气 城市")
+            await _send(event, "...你还没绑定天气城市。\n用法：/我的天气 城市")
         return
 
     if content in ("取消", "删除", "清除"):
         if user_id in _weather_user_binds:
             del _weather_user_binds[user_id]
             _save_weather_user_binds(_weather_user_binds)
-            await my_weather_cmd.send("...已取消天气绑定。")
+            await _send(event, "...已取消天气绑定。")
         else:
-            await my_weather_cmd.send("...你还没绑定天气城市。")
+            await _send(event, "...你还没绑定天气城市。")
         return
 
     # 绑定
     _weather_user_binds[user_id] = {"city": content}
     _save_weather_user_binds(_weather_user_binds)
-    await my_weather_cmd.send(f"...已绑定天气城市：{content}\n以后直接发 /天气 就能查了。\n提示：同名城市可加省份，如 /我的天气 广东深圳")
+    await _send(event, f"...已绑定天气城市：{content}\n以后直接发 /天气 就能查了。\n提示：同名城市可加省份，如 /我的天气 广东深圳")
 
 
 weather_cmd = _register("天气", _cmd_weather, aliases=["weather"])

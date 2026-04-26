@@ -36,6 +36,17 @@ from .maimai import load_binds, save_binds
 
 # -- 帮助 --
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 async def _cmd_help(event: MessageEvent):
     content = str(event.message).strip()
     for prefix in ["帮助", "help"]:
@@ -148,9 +159,9 @@ async def _cmd_help(event: MessageEvent):
     }
 
     if page in pages:
-        await help_cmd.send(pages[page])
+        await _send(event, pages[page])
     else:
-        await help_cmd.send("...没有这一页。/帮助 1~4")
+        await _send(event, "...没有这一页。/帮助 1~4")
 
 help_cmd = _register("帮助", _cmd_help, aliases=["help"])
 
@@ -158,9 +169,9 @@ help_cmd = _register("帮助", _cmd_help, aliases=["help"])
 
 async def _cmd_admin_help(event: MessageEvent):
     if not check_superuser(str(event.user_id)):
-        await admin_help_cmd.send("...你不是管理员。")
+        await _send(event, "...你不是管理员。")
         return
-    await admin_help_cmd.send("""[ 管理命令 ] (仅管理员)
+    await _send(event, """[ 管理命令 ] (仅管理员)
 
   群管
     /禁言 @某人 [时长] - 禁言(默认30分钟)
@@ -210,12 +221,12 @@ async def _cmd_sticker_list(event: MessageEvent):
     from .commands_sticker import list_stickers
     stickers = list_stickers()
     if not stickers:
-        await sticker_list_cmd.send("...还没有表情包。")
+        await _send(event, "...还没有表情包。")
         return
     lines = ["【希亚表情包】"]
     lines.extend(stickers)
     lines.append(f"共 {len(stickers)} 个表情包")
-    await sticker_list_cmd.send("\n".join(lines))
+    await _send(event, "\n".join(lines))
 
 sticker_list_cmd = _register("表情包", _cmd_sticker_list, aliases=["stickers"])
 
@@ -224,7 +235,7 @@ sticker_list_cmd = _register("表情包", _cmd_sticker_list, aliases=["stickers"
 async def _cmd_selftest(event: MessageEvent):
     """自检：检查所有模块状态"""
     if not check_superuser(str(event.user_id)):
-        await selftest_cmd.send("...你不是管理员。")
+        await _send(event, "...你不是管理员。")
         return
 
     results = []
@@ -333,7 +344,7 @@ async def _cmd_selftest(event: MessageEvent):
     results.append(f"  提醒数量: {sum(len(v) for v in reminders.values())}条")
     results.append(f"  黑名单: {len(user_blacklist)}人")
 
-    await selftest_cmd.send("\n".join(results))
+    await _send(event, "\n".join(results))
 
 selftest_cmd = _register("自测", _cmd_selftest, admin_only=True)
 
@@ -342,7 +353,7 @@ selftest_cmd = _register("自测", _cmd_selftest, admin_only=True)
 async def _cmd_test_commands(event: MessageEvent):
     """测试所有命令是否可正常注册和响应"""
     if not check_superuser(str(event.user_id)):
-        await test_cmd.send("...你不是管理员。")
+        await _send(event, "...你不是管理员。")
         return
 
     results = []
@@ -484,14 +495,14 @@ async def _cmd_test_commands(event: MessageEvent):
 
     results.append("\n测试完成。")
 
-    await test_cmd.send("\n".join(results))
+    await _send(event, "\n".join(results))
 
 test_cmd = _register("测试命令", _cmd_test_commands, admin_only=True)
 
 # -- 人设 --
 
 async def _cmd_persona(event: MessageEvent):
-    await persona_cmd.send("吾乃结城希亚，玖方女学院2年级，瓦尔哈拉社领导人。正义的伙伴。喜欢吃芭菲。\n...就这些，够了。⚡")
+    await _send(event, "吾乃结城希亚，玖方女学院2年级，瓦尔哈拉社领导人。正义的伙伴。喜欢吃芭菲。\n...就这些，够了。⚡")
 
 persona_cmd = _register("人设", _cmd_persona)
 
@@ -501,16 +512,16 @@ async def _cmd_reset(event: MessageEvent):
     user_id = str(event.user_id)
     if user_id in chat_history:
         chat_history[user_id] = [{"role": "system", "content": load_persona()}]
-        await reset_cmd.send("记住了。之前的对话我忘了。")
+        await _send(event, "记住了。之前的对话我忘了。")
     else:
-        await reset_cmd.send("...我们之前有聊过吗。")
+        await _send(event, "...我们之前有聊过吗。")
 
 reset_cmd = _register("重置", _cmd_reset)
 
 # -- 戳我 --
 
 async def _cmd_poke(event: MessageEvent):
-    await poke_cmd.send(random.choice([
+    await _send(event, random.choice([
         "你干嘛。", "...别戳了。", "再戳试试？⚡",
         "哈？你有事吗。", "...好烦。",
         "！...你、你突然戳我干嘛啦。",
@@ -521,7 +532,7 @@ poke_cmd = _register("戳我", _cmd_poke)
 # -- 笑话 --
 
 async def _cmd_joke(event: MessageEvent):
-    await joke_cmd.send(random.choice([
+    await _send(event, random.choice([
         "为什么海是蓝色的？因为小鱼在吐泡泡：blue blue blue...咳，这种冷笑话我才不是故意讲的。",
         "什么东西越洗越脏？水。这个你应该知道吧。",
         "为什么猫喜欢睡觉？因为...它们是猫啊。嗯。",
@@ -557,7 +568,7 @@ async def _cmd_riddle(event: MessageEvent):
         {"question": "什么东西越生气越大？", "answer": "脾气"},
     ]
     r = random.choice(riddles)
-    await riddle_cmd.send(f"🤔 {r['question']}\n...猜不出来可以私聊问我。")
+    await _send(event, f"🤔 {r['question']}\n...猜不出来可以私聊问我。")
 
 riddle_cmd = _register("谜语", _cmd_riddle)
 
@@ -572,7 +583,7 @@ async def _cmd_draw(event: MessageEvent):
         ("下下签", "...别灰心。正义的伙伴也会遇到困难。")
     ]
     name, desc = random.choice(lots)
-    await draw_cmd.send(f"🎐 {name}。{desc}")
+    await _send(event, f"🎐 {name}。{desc}")
 
 draw_cmd = _register("抽签", _cmd_draw)
 
@@ -595,7 +606,7 @@ async def _cmd_fortune(event: MessageEvent):
     }
     if fortune_type not in items:
         fortune_type = "综合"
-    await fortune_cmd.send(f"🌟 {fortune_type}运势：{random.choice(items[fortune_type])}")
+    await _send(event, f"🌟 {fortune_type}运势：{random.choice(items[fortune_type])}")
 
 fortune_cmd = _register("运势", _cmd_fortune)
 
@@ -653,9 +664,9 @@ async def _cmd_idiom(event: MessageEvent):
     if last_idiom:
         matching = [i for i in idioms if i[0] == last_idiom[-1]]
         if matching:
-            await idiom_cmd.send(f"{random.choice(matching)}。该你了。")
+            await _send(event, f"{random.choice(matching)}。该你了。")
             return
-    await idiom_cmd.send(f"好，我先来。{random.choice(idioms)}。接吧。")
+    await _send(event, f"好，我先来。{random.choice(idioms)}。接吧。")
 
 idiom_cmd = _register("成语", _cmd_idiom)
 
@@ -671,9 +682,9 @@ async def _cmd_music(event: MessageEvent):
             break
 
     if not content:
-        await music_cmd.send("...想听什么歌？告诉我歌名。")
+        await _send(event, "...想听什么歌？告诉我歌名。")
 
-    await music_cmd.send(f"...在找「{content}」...")
+    await _send(event, f"...在找「{content}」...")
 
     try:
         from .utils import get_shared_http_client
@@ -688,7 +699,7 @@ async def _cmd_music(event: MessageEvent):
         )
 
         if resp.status_code != 200:
-            await music_cmd.send("...搜索失败了，换个关键词试试？")
+            await _send(event, "...搜索失败了，换个关键词试试？")
             return
 
         data = resp.json()
@@ -696,7 +707,7 @@ async def _cmd_music(event: MessageEvent):
         songs = result.get("songs", [])
 
         if not songs:
-            await music_cmd.send(f"...没找到「{content}」，换个名字试试？")
+            await _send(event, f"...没找到「{content}」，换个名字试试？")
             return
 
         lines = [f"🎵 搜索「{content}」结果："]
@@ -709,12 +720,12 @@ async def _cmd_music(event: MessageEvent):
             lines.append(f"{i}. {name} — {artists}")
             lines.append(f"   {url}")
 
-        await music_cmd.send("\n".join(lines))
+        await _send(event, "\n".join(lines))
 
     except FinishedException:
         raise
     except Exception as e:
         logger.debug(f"[点歌] 搜索失败: {type(e).__name__}")
-        await music_cmd.send("...搜索出错了，稍后再试。")
+        await _send(event, "...搜索出错了，稍后再试。")
 
 music_cmd = _register("点歌", _cmd_music, aliases=["music", "搜歌"])

@@ -36,6 +36,17 @@ _STOP_WORDS = set(
     "some such no nor not only own same so than too very s t m re ve ll d"
 )
 
+
+async def _send(event, msg):
+    """发送消息辅助函数"""
+    from nonebot import get_bot
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
+
+
 async def _cmd_wordcloud(event: MessageEvent):
     """词云统计：/词云 [天数] — 统计全群消息"""
     content = str(event.message).strip()
@@ -53,7 +64,7 @@ async def _cmd_wordcloud(event: MessageEvent):
 
     group_messages = _group_chat_log.get(group_id, [])
     if not group_messages:
-        await wordcloud_cmd.send("...暂时没有群聊天记录可以统计。")
+        await _send(event, "...暂时没有群聊天记录可以统计。")
         return
 
     # 可选：按天数过滤（默认7天）
@@ -69,7 +80,7 @@ async def _cmd_wordcloud(event: MessageEvent):
             all_text += text + " "
 
     if not all_text.strip():
-        await wordcloud_cmd.send(f"...最近{days}天没有群聊天记录可以统计。")
+        await _send(event, f"...最近{days}天没有群聊天记录可以统计。")
         return
 
     # 分词
@@ -92,7 +103,7 @@ async def _cmd_wordcloud(event: MessageEvent):
             words.append(chunk.lower())
         words = [w for w in words if w not in _STOP_WORDS]
     if not words:
-        await wordcloud_cmd.send("...聊天内容太少，统计不出什么来。")
+        await _send(event, "...聊天内容太少，统计不出什么来。")
         return
     # 统计词频
     counter = Counter(words)
@@ -176,7 +187,7 @@ async def _cmd_wordcloud(event: MessageEvent):
         lines = [f"【词云 Top10（近{days}天）】"]
         for i, (word, count) in enumerate(top10, 1):
             lines.append(f"{i}. {word} ({count}次)")
-        await wordcloud_cmd.send("\n".join(lines) + "\n[词云图片]" + MessageSegment.image(f"file://{tmp_path}"))
+        await _send(event, "\n".join(lines) + "\n[词云图片]" + MessageSegment.image(f"file://{tmp_path}"))
     except FinishedException:
         raise
     except Exception as e:
@@ -184,6 +195,6 @@ async def _cmd_wordcloud(event: MessageEvent):
         lines = [f"【词云 Top10（近{days}天）】"]
         for i, (word, count) in enumerate(top10, 1):
             lines.append(f"{i}. {word} ({count}次)")
-        await wordcloud_cmd.send("\n".join(lines))
+        await _send(event, "\n".join(lines))
 
 wordcloud_cmd = _register("词云", _cmd_wordcloud)
