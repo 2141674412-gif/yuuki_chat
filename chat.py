@@ -57,11 +57,29 @@ _client_lock = threading.Lock()
 # ---- 全局 HTTP 客户端（连接池复用） ----
 from .utils import get_shared_http_client as _get_http_client
 
-# ---- 截图记账去重缓存 ----
+# ---- 截图记账去重缓存（持久化） ----
+_ACCOUNTING_SEEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "accounting_seen.json")
 _accounting_seen_cache = {}
 
 def _get_accounting_seen():
+    global _accounting_seen_cache
+    if not _accounting_seen_cache and os.path.exists(_ACCOUNTING_SEEN_FILE):
+        try:
+            import json
+            with open(_ACCOUNTING_SEEN_FILE, "r", encoding="utf-8") as f:
+                _accounting_seen_cache = json.load(f)
+        except Exception:
+            _accounting_seen_cache = {}
     return _accounting_seen_cache
+
+def _save_accounting_seen():
+    try:
+        os.makedirs(os.path.dirname(_ACCOUNTING_SEEN_FILE), exist_ok=True)
+        import json
+        with open(_ACCOUNTING_SEEN_FILE, "w", encoding="utf-8") as f:
+            json.dump(_accounting_seen_cache, f)
+    except Exception:
+        pass
 
 
 def _get_client() -> OpenAI:
@@ -807,6 +825,7 @@ async def handle_image_chat(event: MessageEvent):
             oldest = sorted(_accounting_seen.items(), key=lambda x: x[1])[:500]
             _accounting_seen.clear()
             _accounting_seen.update(dict(oldest))
+        _save_accounting_seen()
 
     try:
         # 下载并处理所有图片
