@@ -688,19 +688,16 @@ def _format_num(n):
         return f"{n / 10000:.1f}万"
     return str(n)
 
-async def _resolve_b23(client, short_id: str) -> str:
+async def _resolve_b23(short_id: str) -> str:
     """解析b23.tv短链接，返回BV号"""
     try:
-        resp = await client.get(
-            f"https://b23.tv/{short_id}",
-            headers=_BILI_HEADERS,
-            timeout=5.0,
-            follow_redirects=True
-        )
-        url = str(resp.url)
-        m = re.search(r'BV[a-zA-Z0-9]+', url)
-        if m:
-            return m.group(0)
+        import httpx
+        async with httpx.AsyncClient(headers=_BILI_HEADERS, timeout=5.0, follow_redirects=True) as c:
+            resp = await c.get(f"https://b23.tv/{short_id}")
+            url = str(resp.url)
+            m = re.search(r'BV[a-zA-Z0-9]+', url)
+            if m:
+                return m.group(0)
     except Exception as e:
         logger.warning(f"[B站] 解析短链接失败: {e}")
     return ""
@@ -761,7 +758,7 @@ async def handle_bilibili(event: MessageEvent):
     # 如果是短链接，先解析
     if not bvid and b23_id:
         logger.info(f"[B站] 解析短链接: b23.tv/{b23_id}")
-        bvid = await _resolve_b23(client, b23_id)
+        bvid = await _resolve_b23(b23_id)
 
     if not bvid:
         return
