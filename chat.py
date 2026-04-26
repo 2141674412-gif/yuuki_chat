@@ -796,6 +796,10 @@ async def handle_image_chat(event: MessageEvent):
         seen_key = f"{uid}:{img_files[0]}"
         if seen_key in _accounting_seen:
             logger.info(f"[截图记账] 跳过重复图片: {img_files[0]}")
+            try:
+                await _img_chat.send("...这张截图已经记过了。")
+            except Exception:
+                pass
             return
         _accounting_seen[seen_key] = time.time()
         # 只保留最近1000条

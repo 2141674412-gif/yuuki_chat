@@ -226,6 +226,14 @@ async def _cmd_bill(event: MessageEvent):
     else:
         lines.append(f"  📉 结余　{net:.2f}")
 
+    # 每笔明细
+    lines.append("")
+    lines.append("明细：")
+    for r in reversed(filtered):  # 最新的在前
+        icon = "📥" if r["type"] == "income" else "📤"
+        sign = "+" if r["type"] == "income" else "-"
+        lines.append(f"  {r['date']} {icon} {r['note']}　{sign}{r['amount']:.2f}")
+
     await bill_cmd.finish("\n".join(lines))
 
 
