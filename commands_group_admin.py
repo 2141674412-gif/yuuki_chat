@@ -62,8 +62,8 @@ async def _cmd_ban(event: MessageEvent, bot: Bot):
             await _send(event, f"已禁言 {duration // 60} 分钟~")
         except FinishedException:
             raise
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[禁言] 发送结果通知失败: {e}")
     except FinishedException:
         raise
     except Exception as e:
@@ -92,8 +92,8 @@ async def _cmd_kick(event: MessageEvent, bot: Bot):
             await _send(event, "已送走~")
         except FinishedException:
             raise
-        except Exception:
-            pass  # 发送失败不影响踢人结果
+        except Exception as e:
+            logger.debug(f"[踢] 发送结果通知失败: {e}")
     except FinishedException:
         raise
     except Exception as e:
@@ -183,8 +183,8 @@ def _load_welcome_config():
                 cfg = json.load(f)
                 _welcome_enabled = cfg.get("enabled", True)
                 _welcome_msg = cfg.get("message", _welcome_msg)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[群管] 加载欢迎配置失败: {e}")
 
 _load_welcome_config()
 
@@ -201,8 +201,8 @@ async def _on_group_increase(bot: Bot, event: GroupIncreaseNoticeEvent):
     try:
         if event.user_id == bot.self_id:
             return
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[欢迎] 检查bot自身失败: {e}")
     from .config import ALLOWED_GROUPS
     if event.group_id not in ALLOWED_GROUPS:
         return
@@ -254,8 +254,8 @@ def _load_filter_config():
                 cfg = json.load(f)
                 _filter_words = cfg.get("words", [])
                 _filter_action = cfg.get("action", "warn")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[群管] 加载过滤配置失败: {e}")
 
 _load_filter_config()
 
@@ -281,23 +281,23 @@ async def _on_keyword_filter(bot: Bot, event: _GME):
             if _filter_action in ("delete", "ban"):
                 try:
                     await bot.delete_msg(message_id=event.message_id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[群管] 撤回消息失败: {e}")
             if _filter_action == "ban":
                 try:
                     await bot.set_group_ban(
                         group_id=gid, user_id=event.user_id, duration=600
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[群管] 禁言失败: {e}")
             # 通知管理员
             try:
                 await bot.send_group_msg(
                     group_id=gid,
                     message=f"[关键词过滤] 检测到违规内容，已处理。\n用户: {event.user_id} | 匹配: {word}"
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[群管] 通知管理员失败: {e}")
             return
 
 
@@ -338,8 +338,8 @@ async def _cmd_set_welcome(event: MessageEvent):
         cfg_file = os.path.join(_DATA_DIR, "group_welcome.json")
         with open(cfg_file, "w", encoding="utf-8") as f:
             json.dump({"enabled": _welcome_enabled, "message": _welcome_msg}, f, ensure_ascii=False)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[群管] 保存欢迎配置失败: {e}")
     await _send(event, f"...欢迎语已设置：{content}")
 
 
@@ -363,8 +363,8 @@ async def _cmd_add_filter(event: MessageEvent):
         )
         return
 
-    if content not in _filter_words:
-        _filter_words.append(content)
+    if content.lower() not in _filter_words:
+        _filter_words.append(content.lower())
     # 保存
     try:
         from .commands_base import _DATA_DIR
@@ -372,8 +372,8 @@ async def _cmd_add_filter(event: MessageEvent):
         cfg_file = os.path.join(_DATA_DIR, "group_filter.json")
         with open(cfg_file, "w", encoding="utf-8") as f:
             json.dump({"words": _filter_words, "action": _filter_action}, f, ensure_ascii=False)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[群管] 保存过滤词失败: {e}")
     await _send(event, f"...已添加过滤词：{content}（共{len(_filter_words)}个）")
 
 
@@ -389,17 +389,20 @@ async def _cmd_del_filter(event: MessageEvent):
         await _send(event, "...删哪个？用法：/删过滤 关键词")
         return
 
-    if content in _filter_words:
-        _filter_words.remove(content)
-    try:
-        from .commands_base import _DATA_DIR
-        import json
-        cfg_file = os.path.join(_DATA_DIR, "group_filter.json")
-        with open(cfg_file, "w", encoding="utf-8") as f:
-            json.dump({"words": _filter_words, "action": _filter_action}, f, ensure_ascii=False)
-    except Exception:
-        pass
-    await _send(event, f"...已删除过滤词：{content}（剩余{len(_filter_words)}个）")
+    word_lower = content.lower()
+    if word_lower in _filter_words:
+        _filter_words.remove(word_lower)
+        try:
+            from .commands_base import _DATA_DIR
+            import json
+            cfg_file = os.path.join(_DATA_DIR, "group_filter.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"words": _filter_words, "action": _filter_action}, f, ensure_ascii=False)
+        except Exception as e:
+            logger.debug(f"[群管] 保存过滤词失败: {e}")
+        await _send(event, f"...已删除过滤词：{content}（剩余{len(_filter_words)}个）")
+    else:
+        await _send(event, f"...没有找到过滤词「{content}」。")
 
 
 async def _cmd_filter_mode(event: MessageEvent):
@@ -427,8 +430,8 @@ async def _cmd_filter_mode(event: MessageEvent):
             cfg_file = os.path.join(_DATA_DIR, "group_filter.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"words": _filter_words, "action": _filter_action}, f, ensure_ascii=False)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[群管] 保存过滤模式失败: {e}")
         mode_names = {"warn": "仅通知", "delete": "撤回", "ban": "撤回+禁言"}
         await _send(event, f"...过滤模式已设为：{mode_names.get(content, content)}")
     else:

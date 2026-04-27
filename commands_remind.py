@@ -4,8 +4,28 @@ from datetime import datetime, timedelta
 import re
 
 from nonebot.adapters.onebot.v11 import MessageEvent
+from nonebot import logger
 
 from .commands_base import _register, _save_reminders, reminders
+
+
+def _cleanup_expired_reminders():
+    """清理已过期的提醒"""
+    now = datetime.now()
+    changed = False
+    for user_id in list(reminders.keys()):
+        before = len(reminders[user_id])
+        reminders[user_id] = [r for r in reminders[user_id] if r["time"] > now]
+        if len(reminders[user_id]) < before:
+            changed = True
+        if not reminders[user_id]:
+            del reminders[user_id]
+    if changed:
+        _save_reminders()
+        logger.info("[提醒] 已清理过期提醒")
+
+
+_cleanup_expired_reminders()
 
 
 # -- 提醒 --
@@ -39,7 +59,7 @@ async def _cmd_remind(event: MessageEvent):
         remind_time = now + delta[unit]
         remind_content = content.replace(time_match.group(0), "").strip()
 
-        if remind_time <= now:
+        if remind_time < now:
             await _send(event, "时间已过，请设置未来的时间。")
             return
 
@@ -141,7 +161,26 @@ async def _check_reminders():
                 )
                 logger.info(f"[提醒] 已向用户 {user_id} 发送提醒：{r['content']}")
             except Exception as e:
-                logger.warning(f"[提醒] 向用户 {user_id} 发送提醒失败：{e}")
+                logger.warning(f"[提醒] 向用户 {user_id} 发送私聊提醒失败：{e}，尝试群消息发送")
+                # 私聊失败，尝试发送到已知群
+                sent = False
+                try:
+                    from .config import ALLOWED_GROUPS
+                    for gid in ALLOWED_GROUPS:
+                        try:
+                            await bot.send_group_msg(
+                                group_id=gid,
+                                message=f"[CQ:at,qq={user_id}] 到点了。{r['content']}。",
+                            )
+                            logger.info(f"[提醒] 已通过群 {gid} 向用户 {user_id} 发送提醒")
+                            sent = True
+                            break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+                if not sent:
+                    logger.warning(f"[提醒] 向用户 {user_id} 发送提醒完全失败")
         reminders[user_id] = [r for r in user_reminders if r["time"] > now]
         changed = True
 

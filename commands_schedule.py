@@ -260,7 +260,22 @@ async def _cmd_cancel_schedule(event: MessageEvent):
             pass
         await _send(event, f"已取消 {content} 的定时任务。")
     else:
-        await _send(event, f"...没有找到 {content} 的定时任务。")
+        # 尝试匹配一次性任务（key格式为 group_id:once:timestamp，按内容搜索）
+        matched_key = None
+        for k, v in _scheduled_tasks.items():
+            if k.startswith(f"{group_id}:once:") and v.get("content") == content:
+                matched_key = k
+                break
+        if matched_key:
+            del _scheduled_tasks[matched_key]
+            _save_scheduled_tasks()
+            try:
+                _get_scheduler().remove_job(f"sched_{matched_key}")
+            except Exception:
+                pass
+            await _send(event, f"已取消一次性定时任务：{content}")
+        else:
+            await _send(event, f"...没有找到 {content} 的定时任务。")
 
 schedule_cmd = _register("定时", _cmd_schedule)
 schedule_list_cmd = _register("定时列表", _cmd_schedule_list)

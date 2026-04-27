@@ -35,11 +35,6 @@ def _clean_html(text: str) -> str:
     return text
 
 
-def _is_chinese(text: str) -> bool:
-    """检查文本是否包含中文"""
-    return bool(re.search(r'[\u4e00-\u9fff]', text))
-
-
 def _is_quality_result(title: str, desc: str) -> bool:
     """检查结果质量"""
     # 过滤太短的描述
@@ -333,6 +328,13 @@ async def _cmd_search(event: MessageEvent):
         if text:
             # 缓存
             _search_cache[cache_key] = {"text": text, "time": time.time()}
+            # 清理：超过1小时的条目，当缓存大小 > 30 时触发
+            if len(_search_cache) > 30:
+                now_ts = time.time()
+                expired_keys = [k for k, v in _search_cache.items() if now_ts - v["time"] > 3600]
+                for k in expired_keys:
+                    del _search_cache[k]
+            # 如果仍然超过50，按LRU清理最旧的
             if len(_search_cache) > 50:
                 oldest = min(_search_cache, key=lambda k: _search_cache[k]["time"])
                 del _search_cache[oldest]
