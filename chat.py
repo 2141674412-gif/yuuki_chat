@@ -214,9 +214,9 @@ def _update_user_profile(user_id: str, message: str):
         profile["interaction_count"] = 0
     profile["interaction_count"] += 1
 
-    # 主人好感度固定100，不衰减
+    # 主人好感度固定999，不衰减
     if user_id == _get_owner_qq():
-        profile["affinity"] = 100
+        profile["affinity"] = 999
     else:
         msg_lower = message.lower()
 
@@ -310,7 +310,7 @@ def _get_user_context(user_id: str) -> str:
     if profile.get("mentioned_count", 0) > 10:
         parts.append("这个用户经常和你聊天，算是老熟人了")
     affinity = profile.get("affinity", 0)
-    if affinity >= 100:
+    if affinity >= 999:
         parts.append("这是你的主人，最亲密的人，可以撒娇、任性，不用敬语")
     elif affinity >= 80:
         parts.append("和这个用户非常亲密，可以撒娇、开玩笑")

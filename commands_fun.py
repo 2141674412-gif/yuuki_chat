@@ -725,7 +725,7 @@ async def _cmd_affinity(event: MessageEvent):
     interactions = profile.get("interaction_count", 0)
     name = profile.get("name", "")
 
-    if affinity >= 100:
+    if affinity >= 999:
         level = "💖 主人"
     elif affinity >= 80:
         level = "💕 非常亲密"
@@ -738,7 +738,8 @@ async def _cmd_affinity(event: MessageEvent):
     else:
         level = "😶 陌生人"
 
-    msg = f"「{'你' if not name else name}」的好感度\n{level}\n❤️ {affinity}/100\n💬 累计互动 {interactions} 次"
+    display_affinity = "∞" if affinity >= 999 else f"{affinity}/99"
+    msg = f"「{'你' if not name else name}」的好感度\n{level}\n❤️ {display_affinity}\n💬 累计互动 {interactions} 次"
     await _send(event, msg)
 
 affinity_cmd = _register("好感度", _cmd_affinity, aliases=["affinity"])
