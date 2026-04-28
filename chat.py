@@ -128,6 +128,7 @@ def _create_client() -> OpenAI:
         base_url=_cfg("api_base", "http://127.0.0.1:11434/v1"),
         http_client=http_client,
         max_retries=2,  # SDK级别重试
+        timeout=httpx.Timeout(30.0, connect=10.0),  # 30秒超时，连接10秒
     )
 
 
@@ -588,7 +589,10 @@ async def _ai_generate_reply(context: str, system_prompt: str) -> str:
                 timeout=15.0
             )
 
-        response = await loop.run_in_executor(None, _do_api)
+        response = await asyncio.wait_for(
+            loop.run_in_executor(None, _do_api),
+            timeout=30.0
+        )
         if not response.choices or not response.choices[0].message.content:
             return None
         reply = response.choices[0].message.content.strip()
@@ -1184,7 +1188,10 @@ async def handle_image_chat(event: MessageEvent):
                 )
 
             try:
-                classify_resp = await loop.run_in_executor(None, _do_classify)
+                classify_resp = await asyncio.wait_for(
+                    loop.run_in_executor(None, _do_classify),
+                    timeout=30.0
+                )
                 if classify_resp.choices:
                     classify_result = classify_resp.choices[0].message.content.strip()
                     if "是" in classify_result and "否" not in classify_result:
@@ -1221,7 +1228,10 @@ type规则：支出→"expense"，收入→"income"
                                 timeout=30.0
                             )
 
-                        response = await loop.run_in_executor(None, _do_accounting_vision)
+                        response = await asyncio.wait_for(
+                            loop.run_in_executor(None, _do_accounting_vision),
+                            timeout=45.0
+                        )
                         if response.choices and response.choices[0].message.content:
                             reply = response.choices[0].message.content.strip()
                             json_match = re.search(r'\{.*\}', reply, re.DOTALL)
@@ -1370,7 +1380,10 @@ type规则：支出→"expense"，收入→"income"
                 timeout=30.0
             )
 
-        response = await loop.run_in_executor(None, _do_vision)
+        response = await asyncio.wait_for(
+            loop.run_in_executor(None, _do_vision),
+            timeout=45.0
+        )
         if not response.choices or not response.choices[0].message.content:
             return
         reply = response.choices[0].message.content.strip()
@@ -1566,15 +1579,15 @@ async def on_bot_startup():
         )
         logger.info("[定时清理] 已注册 chat_history 定时清理任务（每小时一次）")
 
-        # 每10分钟检查bot连接健康状态
+        # 每3分钟检查bot连接健康状态
         sched.add_job(
             _check_bot_health,
             "interval",
-            minutes=10,
+            minutes=3,
             id="bot_health_check",
             replace_existing=True,
         )
-        logger.info("[健康检查] 已注册连接健康检查（每10分钟）")
+        logger.info("[健康检查] 已注册连接健康检查（每3分钟）")
     except Exception as e:
         logger.warning(f"[定时清理] 注册失败（APScheduler 可能未安装）: {e}")
 
@@ -1589,4 +1602,17 @@ async def _check_bot_health():
         logger.debug("[健康检查] bot连接正常")
     except Exception as e:
         logger.warning(f"[健康检查] bot连接异常: {e}，尝试重连...")
-        # 连接异常时记录日志，nonebot会自动尝试重连
+        try:
+            # 尝试通过WebSocket发送ping来触发重连
+            from nonebot.drivers.websocket import WebSocket
+            # 获取WebSocket连接
+            ws_connections = getattr(bot, '_ws_connections', None)
+            if ws_connections:
+                for ws in list(ws_connections):
+                    try:
+                        await ws.send_str('{"type":"ping"}')
+                        logger.info("[健康检查] 已发送ping，等待响应...")
+                    except Exception:
+                        logger.warning("[健康检查] ping发送失败，连接已断开")
+        except Exception as e2:
+            logger.debug(f"[健康检查] 重连尝试失败: {e2}")
