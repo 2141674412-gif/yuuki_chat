@@ -272,6 +272,17 @@ _SLEEP_REPLIES = [
 
 _sleep_cmd = on_message(priority=0, block=False)
 
+# 全局群白名单拦截器（最高优先级，阻断非白名单群的所有消息处理）
+_group_gate = on_message(priority=-100, block=False)
+
+@_group_gate.handle()
+async def _block_non_whitelist(event: MessageEvent):
+    """非白名单群的群消息直接阻断，不进入任何后续handler"""
+    gid = getattr(event, 'group_id', None)
+    if gid and gid not in ALLOWED_GROUPS:
+        # 非白名单群，设置block=True阻止后续handler
+        _group_gate.block = True
+
 @_sleep_cmd.handle()
 async def handle_sleep_at(event: GroupMessageEvent):
     """群里有人@bot时，如果不是主人@的，回复在睡觉"""
