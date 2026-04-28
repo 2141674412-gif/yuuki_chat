@@ -49,6 +49,18 @@ if _os.path.isfile(_pending):
             pass
 # === 更新应用完毕 ===
 
+# === 启动时清理废弃文件 ===
+_PLUGIN_DIR = _os.path.dirname(_os.path.abspath(__file__))
+_DEPRECATED_FILES = ["onebot_client.py", "commands.py", "commands_bilibili.py"]
+for _dep in _DEPRECATED_FILES:
+    _dep_path = _os.path.join(_PLUGIN_DIR, _dep)
+    if _os.path.isfile(_dep_path):
+        try:
+            _os.remove(_dep_path)
+        except Exception:
+            pass
+# === 清理完毕 ===
+
 import time
 
 from nonebot import get_driver, logger
