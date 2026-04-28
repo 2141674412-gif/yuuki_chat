@@ -162,13 +162,15 @@ class OneBotClient:
     def __init__(
         self,
         ws_url: str = "ws://127.0.0.1:8888/onebot/v11/ws",
+        access_token: str = "",
         reconnect_interval: float = 5.0,
         heartbeat_interval: float = 30.0,
     ):
         self.ws_url = ws_url
+        self.access_token = access_token
         self.reconnect_interval = reconnect_interval
         self.heartbeat_interval = heartbeat_interval
-        self._ws: Optional[websockets.WebSocketClientProtocol] = None
+        self._ws = None
         self._running = False
         self._api_futures: dict[str, asyncio.Future] = {}
         self._event_handlers: dict[str, list[Callable]] = {}
@@ -216,9 +218,13 @@ class OneBotClient:
         """启动客户端, 连接 WebSocket 并开始事件循环"""
         self._running = True
         log.info(f"正在连接 {self.ws_url} ...")
+        # 构建连接参数
+        extra_headers = {}
+        if self.access_token:
+            extra_headers["Authorization"] = f"Bearer {self.access_token}"
         while self._running:
             try:
-                async with websockets.connect(self.ws_url) as ws:
+                async with websockets.connect(self.ws_url, additional_headers=extra_headers) as ws:
                     self._ws = ws
                     log.info("WebSocket 连接成功")
                     await self._recv_loop(ws)
@@ -241,7 +247,7 @@ class OneBotClient:
     # 接收循环与事件分发
     # ----------------------------------------------------------
 
-    async def _recv_loop(self, ws: websockets.WebSocketClientProtocol):
+    async def _recv_loop(self, ws):
         """消息接收主循环"""
         hb_task = asyncio.create_task(self._heartbeat_loop(ws)) if self.heartbeat_interval > 0 else None
         try:
@@ -278,7 +284,7 @@ class OneBotClient:
         if post_type not in self._event_handlers and post_type != "meta_event":
             log.debug(f"未处理事件: {post_type} - {event}")
 
-    async def _heartbeat_loop(self, ws: websockets.WebSocketClientProtocol):
+    async def _heartbeat_loop(self, ws):
         """心跳保活循环"""
         while True:
             await asyncio.sleep(self.heartbeat_interval)
@@ -357,6 +363,7 @@ async def example():
     """
     client = OneBotClient(
         ws_url="ws://127.0.0.1:8888/onebot/v11/ws",
+        access_token="",  # 如果NapCat配置了token，填在这里
         reconnect_interval=5.0,
         heartbeat_interval=30.0,
     )
@@ -405,7 +412,14 @@ async def example():
 
     # --- 启动连接 ---
     connect_task = asyncio.create_task(client.connect())
-    await asyncio.sleep(3)  # 等待连接建立
+    # 等待连接成功（最多10秒）
+    for _ in range(20):
+        await asyncio.sleep(0.5)
+        if client._ws is not None:
+            break
+    else:
+        log.error("连接超时，请检查NapCat是否启动")
+        return
 
     try:
         info = await client.get_login_info()
