@@ -134,6 +134,11 @@ async def _cmd_help(event: MessageEvent):
     /绑定token token - 绑定Token
     /解绑 - 解除绑定
 
+  机台
+    /查机台 关键词 - 查机台狗号
+    /查机台 舞萌 关键词 - 仅舞萌
+    /查机台 中二 关键词 - 仅中二
+
 {_nav}""",
         4: """[ 命令列表 4/5 - 管理命令 ] (仅管理员)
 

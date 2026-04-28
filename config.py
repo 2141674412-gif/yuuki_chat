@@ -69,6 +69,7 @@ COMMAND_NAMES = [
     "设置欢迎", "setwelcome", "加过滤", "addfilter", "加屏蔽",
     "删过滤", "delfilter", "删屏蔽", "过滤模式", "filtermode",
     "自检", "测试命令",
+    "查机台",
 ]
 
 # ========== 人设配置 ==========
