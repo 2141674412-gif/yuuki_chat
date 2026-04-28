@@ -701,9 +701,25 @@ music_cmd = _register("点歌", _cmd_music, aliases=["music", "搜歌"])
 # -- 好感度 --
 
 async def _cmd_affinity(event: MessageEvent):
-    """查看好感度"""
+    """查看好感度（仅管理员）"""
+    from .commands_base import check_superuser
+    if not check_superuser(str(event.user_id)):
+        await _send(event, "...这不是你能看的。")
+        return
     from .chat import _user_profiles
+    content = str(event.message).strip()
+    for prefix in ["好感度", "affinity"]:
+        if content.lower().startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+    # 支持查看指定用户
     uid = str(event.user_id)
+    if content:
+        # 提取QQ号（从@或纯数字）
+        import re
+        m = re.search(r'\d{5,12}', content)
+        if m:
+            uid = m.group()
     profile = _user_profiles.get(uid, {})
     affinity = profile.get("affinity", 0)
     interactions = profile.get("interaction_count", 0)

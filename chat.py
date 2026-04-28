@@ -256,17 +256,17 @@ def _get_user_context(user_id: str) -> str:
         parts.append("这个用户经常和你聊天，算是老熟人了")
     affinity = profile.get("affinity", 0)
     if affinity >= 100:
-        parts.append(f"好感度: {affinity}/100 (这是你的主人，最亲密的人，可以撒娇、任性)")
+        parts.append("这是你的主人，最亲密的人，可以撒娇、任性，不用敬语")
     elif affinity >= 80:
-        parts.append(f"好感度: {affinity}/100 (非常亲密，可以撒娇、开玩笑)")
+        parts.append("和这个用户非常亲密，可以撒娇、开玩笑")
     elif affinity >= 60:
-        parts.append(f"好感度: {affinity}/100 (关系不错，可以轻松聊天)")
+        parts.append("和这个用户关系不错，可以轻松聊天")
     elif affinity >= 40:
-        parts.append(f"好感度: {affinity}/100 (普通朋友，保持礼貌)")
+        parts.append("和这个用户是普通朋友，保持礼貌")
     elif affinity >= 20:
-        parts.append(f"好感度: {affinity}/100 (不太熟，保持距离)")
+        parts.append("和这个用户不太熟，保持距离")
     else:
-        parts.append(f"好感度: {affinity}/100 (陌生人，冷淡对待)")
+        parts.append("和这个用户是陌生人，冷淡对待")
     memories = profile.get("memories", [])
     if memories:
         parts.append("关于这个用户的记忆: " + ", ".join(memories[-5:]))
