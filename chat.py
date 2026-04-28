@@ -171,6 +171,18 @@ def _save_user_profiles():
     except Exception:
         pass
 
+def _add_memory(profile, memory_text):
+    """添加长期记忆，去重，上限20条"""
+    memories = profile.get("memories", [])
+    # 简单去重：如果新记忆的核心词已存在则跳过
+    for m in memories:
+        if any(w in m for w in memory_text if len(w) >= 2):
+            return
+    memories.append(memory_text)
+    if len(memories) > 20:
+        memories = memories[-20:]
+    profile["memories"] = memories
+
 def _update_user_profile(user_id: str, message: str):
     """更新用户画像"""
     if user_id not in _user_profiles:
@@ -185,6 +197,45 @@ def _update_user_profile(user_id: str, message: str):
             profile["topics"].append(keyword)
             if len(profile["topics"]) > 20:
                 profile["topics"] = profile["topics"][-20:]
+
+    # 好感度系统
+    if "affinity" not in profile:
+        profile["affinity"] = 50  # 初始好感度50
+    if "interaction_count" not in profile:
+        profile["interaction_count"] = 0
+    profile["interaction_count"] += 1
+
+    # 每次互动+1好感度，上限100
+    if profile["affinity"] < 100:
+        profile["affinity"] = min(100, profile["affinity"] + 1)
+
+    # 长时间不互动好感度衰减（超过24小时没互动，每次-1）
+    if profile["last_active"] > 0:
+        hours_since = (time.time() - profile["last_active"]) / 3600
+        if hours_since > 24:
+            decay = min(int(hours_since / 24), 5)  # 最多-5
+            profile["affinity"] = max(0, profile["affinity"] - decay)
+
+    # 长期记忆：提取关键信息
+    if "memories" not in profile:
+        profile["memories"] = []
+    # 从消息中提取可能的记忆（简单规则）
+    # 检测自我介绍
+    name_match = re.search(r'我叫(\S+)|我是(\S+)', message)
+    if name_match:
+        name = name_match.group(1) or name_match.group(2)
+        if name and len(name) <= 10:
+            profile["name"] = name
+            _add_memory(profile, f"这个用户的名字是{name}")
+    # 检测喜好表达
+    like_match = re.search(r'(喜欢|爱|最爱|最爱吃)(.{1,10})', message)
+    if like_match:
+        _add_memory(profile, f"喜欢{like_match.group(2)}")
+    # 检测生日
+    bday_match = re.search(r'生日是(\d{1,2})[月-](\d{1,2})', message)
+    if bday_match:
+        _add_memory(profile, f"生日是{bday_match.group(1)}月{bday_match.group(2)}日")
+
     # 定期保存
     if random.random() < 0.1:  # 10%概率保存，避免频繁IO
         _save_user_profiles()
@@ -199,6 +250,20 @@ def _get_user_context(user_id: str) -> str:
         parts.append(f"这个用户经常聊: {', '.join(profile['topics'][-5:])}")
     if profile.get("mentioned_count", 0) > 10:
         parts.append("这个用户经常和你聊天，算是老熟人了")
+    affinity = profile.get("affinity", 50)
+    if affinity >= 80:
+        parts.append(f"好感度: {affinity}/100 (非常亲密，可以撒娇、开玩笑)")
+    elif affinity >= 60:
+        parts.append(f"好感度: {affinity}/100 (关系不错，可以轻松聊天)")
+    elif affinity >= 40:
+        parts.append(f"好感度: {affinity}/100 (普通朋友，保持礼貌)")
+    elif affinity >= 20:
+        parts.append(f"好感度: {affinity}/100 (不太熟，保持距离)")
+    else:
+        parts.append(f"好感度: {affinity}/100 (陌生人，冷淡对待)")
+    memories = profile.get("memories", [])
+    if memories:
+        parts.append("关于这个用户的记忆: " + ", ".join(memories[-5:]))
     return "\n".join(parts) if parts else ""
 
 
@@ -221,9 +286,42 @@ def _cleanup_group_chat_log():
             if len(_group_chat_log[gid]) > 5000:
                 _group_chat_log[gid] = _group_chat_log[gid][-5000:]
 
+# 情绪关键词
+_MOOD_KEYWORDS = {
+    "positive": ["开心", "哈哈", "笑死", "太好了", "好棒", "可爱", "厉害", "牛", "赞", "感谢", "谢谢", "爱你", "么么", "嘿嘿"],
+    "negative": ["难过", "伤心", "哭", "烦", "生气", "讨厌", "累", "困", "痛", "难受", "无聊", "孤独", "寂寞", "焦虑", "压力"],
+    "excited": ["！！！", "！！", "啊啊啊", "冲", "加油", "干", "太强了", "无敌", "绝了", "神"],
+}
+
+def _detect_group_mood(group_id):
+    """检测群聊情绪氛围"""
+    msgs = _group_chat_log.get(group_id, [])
+    if not msgs:
+        return "neutral", ""
+    recent = msgs[-10:]  # 最近10条消息
+    scores = {"positive": 0, "negative": 0, "excited": 0}
+    for _, _, text in recent:
+        text_lower = text.lower()
+        for mood, keywords in _MOOD_KEYWORDS.items():
+            for kw in keywords:
+                if kw in text_lower:
+                    scores[mood] += 1
+    total = sum(scores.values())
+    if total == 0:
+        return "neutral", ""
+    dominant = max(scores, key=scores.get)
+    if scores[dominant] >= 2:
+        mood_map = {
+            "positive": "群里气氛很好，大家很开心",
+            "negative": "群里气氛有些低落，有人不太开心",
+            "excited": "群里气氛很热烈，大家很激动",
+        }
+        return dominant, mood_map.get(dominant, "")
+    return "neutral", ""
+
 # 对话历史时间戳，用于定期清理
 _history_timestamps = {}
-_HISTORY_TTL = 3600  # 1 小时过期时间（秒）
+_HISTORY_TTL = 14400  # 4 小时过期时间（秒）
 
 
 def _cleanup_old_histories():
@@ -402,6 +500,13 @@ async def handle_chat(event: MessageEvent):
         # 普通用户保持正常距离感
         system_prompt += "\n\n[指令] 对普通群友保持礼貌但有点距离感，不要太过亲密。回复简短自然即可。"
 
+    # 情绪感知
+    gid = getattr(event, 'group_id', None)
+    if gid:
+        mood, mood_desc = _detect_group_mood(gid)
+        if mood != "neutral":
+            system_prompt += f"\n\n当前群聊氛围: {mood_desc}。请根据氛围调整你的回复风格。"
+
     # 初始化对话历史
     if user_id not in chat_history:
         chat_history[user_id] = [
@@ -471,8 +576,16 @@ async def handle_chat(event: MessageEvent):
         # 更新用户画像
         _update_user_profile(user_id, message)
 
-        # 限制历史记录长度（主人保留更多上下文）
-        max_history = 21 if user_id == _get_owner_qq() else 11  # 主人10轮，普通5轮
+        # 限制历史记录长度（根据好感度和身份动态调整）
+        affinity = _user_profiles.get(user_id, {}).get("affinity", 50)
+        if user_id == _get_owner_qq():
+            max_history = 31  # 主人15轮
+        elif affinity >= 80:
+            max_history = 21  # 好感度高10轮
+        elif affinity >= 50:
+            max_history = 15  # 中等7轮
+        else:
+            max_history = 11  # 普通5轮
         if len(chat_history[user_id]) > max_history:
             chat_history[user_id] = [chat_history[user_id][0]] + chat_history[user_id][-(max_history-1):]
 
@@ -1520,6 +1633,13 @@ async def _auto_chat_loop():
             if int(group_id) not in ALLOWED_GROUPS:
                 continue
 
+            # 检查群最近是否有活动（5分钟内有消息则不主动发言）
+            recent_msgs = _group_chat_log.get(group_id, [])
+            now = time.time()
+            if recent_msgs and now - recent_msgs[-1][0] < 300:  # 5分钟
+                logger.debug(f"[自动发言] 群{group_id}最近有活动，跳过")
+                continue
+
             # 用AI生成发言
             # 获取群最近聊天记录作为上下文
             recent_msgs = _group_chat_log.get(group_id, [])
@@ -1530,6 +1650,9 @@ async def _auto_chat_loop():
             else:
                 recent_summary = "群里最近没什么消息"
             hint = f"{recent_summary}\n{random.choice(_get_proactive_hints())}"
+            mood, mood_desc = _detect_group_mood(group_id)
+            if mood != "neutral":
+                hint = f"{hint} ({mood_desc})"
             reply = await _ai_generate_reply(hint, _PROACTIVE_SYSTEM_PROMPT)
             if not reply:
                 reply = random.choice(_FALLBACK_TOPICS)

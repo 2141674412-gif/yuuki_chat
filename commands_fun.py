@@ -70,7 +70,7 @@ async def _cmd_help(event: MessageEvent):
         1: f"""[ 命令列表 1/{_total} - 日常 & 趣味 ]
 
   🎯 签到积分
-    /签到 /积分 /排行
+    /签到 /积分 /排行 /好感度
 
   🎲 趣味
     /抽签 /运势 /成语 /笑话 /谜语 /戳我
@@ -697,3 +697,30 @@ async def _cmd_music(event: MessageEvent):
         await _send(event, "...搜索出错了，稍后再试。")
 
 music_cmd = _register("点歌", _cmd_music, aliases=["music", "搜歌"])
+
+# -- 好感度 --
+
+async def _cmd_affinity(event: MessageEvent):
+    """查看好感度"""
+    from .chat import _user_profiles
+    uid = str(event.user_id)
+    profile = _user_profiles.get(uid, {})
+    affinity = profile.get("affinity", 50)
+    interactions = profile.get("interaction_count", 0)
+    name = profile.get("name", "")
+
+    if affinity >= 80:
+        level = "💕 非常亲密"
+    elif affinity >= 60:
+        level = "😊 关系不错"
+    elif affinity >= 40:
+        level = "🙂 普通朋友"
+    elif affinity >= 20:
+        level = "😐 不太熟"
+    else:
+        level = "😶 陌生人"
+
+    msg = f"「{'你' if not name else name}」的好感度\n{level}\n❤️ {affinity}/100\n💬 累计互动 {interactions} 次"
+    await _send(event, msg)
+
+affinity_cmd = _register("好感度", _cmd_affinity, aliases=["affinity"])
