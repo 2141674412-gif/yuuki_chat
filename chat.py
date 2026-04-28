@@ -808,6 +808,11 @@ async def _resolve_b23(short_id: str) -> str:
 @_bili_chat.handle()
 async def handle_bilibili(event: MessageEvent):
     """检测B站链接/卡片，发送视频信息"""
+    # 群白名单检查
+    gid = getattr(event, 'group_id', None)
+    if gid and gid not in ALLOWED_GROUPS:
+        return
+
     # 从所有segment中提取文本
     full_text = ""
     for seg in event.message:
