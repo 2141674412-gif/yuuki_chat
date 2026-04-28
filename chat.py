@@ -668,18 +668,21 @@ async def handle_chat(event: MessageEvent):
         # 移除孤儿用户消息
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
             chat_history[user_id].pop()
+        _update_user_profile(user_id, message)
         fallback = "嗯...正义的伙伴好像走神了，再说一次？"
         await chat.send(fallback)
     except APIError as e:
         # API 错误（如服务不可用、速率限制等）
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
             chat_history[user_id].pop()
+        _update_user_profile(user_id, message)
         fallback = "唔...脑袋好像有点转不过来，等一下再来吧。"
         await chat.send(fallback)
     except Exception as e:
         # 其他未预期的错误
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
             chat_history[user_id].pop()
+        _update_user_profile(user_id, message)
         fallback = [
             "嗯？怎么了。",
             "...有事就说。",
