@@ -10,6 +10,7 @@ from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent
 
 from .commands_base import _register, _DATA_DIR, _load_json, _save_json
 from .commands_schedule import _get_scheduler
+from .config import ALLOWED_GROUPS
 
 # 生日数据文件
 _BIRTHDAY_FILE = os.path.join(_DATA_DIR, "birthdays.json")
@@ -228,6 +229,9 @@ async def _check_birthdays():
         try:
             int(gid)
         except (ValueError, TypeError):
+            continue
+        # 只向白名单群发送
+        if int(gid) not in ALLOWED_GROUPS:
             continue
 
         if gid not in _blessed[date_key]:

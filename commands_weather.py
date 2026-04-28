@@ -309,6 +309,11 @@ async def _send_weather_report(group_id: str):
         # 更新缓存
         _weather_cache[city] = {"text": weather_text, "time": time.time()}
 
+        from .config import ALLOWED_GROUPS
+        if int(group_id) not in ALLOWED_GROUPS:
+            logger.debug(f"[天气] 跳过非白名单群 {group_id}")
+            return
+
         bot = get_bot()
         await bot.send_group_msg(
             group_id=int(group_id),

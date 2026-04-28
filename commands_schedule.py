@@ -182,6 +182,11 @@ async def _execute_scheduled_task(group_id: str, content: str, task_key: str = N
     """执行定时任务：向指定群发送消息"""
     try:
         from nonebot import get_bot
+        from .config import ALLOWED_GROUPS
+        # 只向白名单群发送
+        if int(group_id) not in ALLOWED_GROUPS:
+            logger.debug(f"[定时] 跳过非白名单群 {group_id}")
+            return
         bot = get_bot()
         await bot.send_group_msg(group_id=int(group_id), message=content)
         logger.info(f"[定时] 已向群 {group_id} 发送定时消息: {content}")

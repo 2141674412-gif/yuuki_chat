@@ -1493,6 +1493,10 @@ async def _auto_chat_loop():
             # 随机选一个群
             group_id = random.choice(_auto_chat_groups)
 
+            # 只向白名单群发言
+            if int(group_id) not in ALLOWED_GROUPS:
+                continue
+
             # 用AI生成发言
             # 获取群最近聊天记录作为上下文
             recent_msgs = _group_chat_log.get(group_id, [])
