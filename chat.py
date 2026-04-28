@@ -643,6 +643,9 @@ _TOPIC_KEYWORDS = {
 # 需要跳过的消息关键词（命令、纯图片、CQ码等）
 _SKIP_PATTERNS = [re.compile(p) for p in [r'\[CQ:', r'/', r'\s*$']]
 
+# 检测是否提到bot名字（希亚/Noa/正义的伙伴等）
+_BOT_NAMES = ["希亚", "noa", "结城", "正义的伙伴", "帕菲女王", "小希亚"]
+
 chatter = on_message(priority=5, block=False)
 
 @chatter.handle()
@@ -677,7 +680,6 @@ async def handle_chatter(event: GroupMessageEvent):
         return
 
     # 检测是否提到bot名字（希亚/Noa/正义的伙伴等）
-    _BOT_NAMES = ["希亚", "noa", "结城", "正义的伙伴", "帕菲女王", "小希亚"]
     mentioned = any(name in msg_lower for name in _BOT_NAMES)
 
     if mentioned:

@@ -184,6 +184,16 @@ async def _cmd_wordcloud(event: MessageEvent):
         tmp_path = os.path.join(tmp_dir, f"wordcloud_{int(time.time())}.png")
         img.save(tmp_path, "PNG")
 
+        # 清理超过1小时的临时文件
+        try:
+            now = time.time()
+            for f_name in os.listdir(tmp_dir):
+                f_path = os.path.join(tmp_dir, f_name)
+                if os.path.isfile(f_path) and now - os.path.getmtime(f_path) > 3600:
+                    os.remove(f_path)
+        except Exception:
+            pass
+
         from nonebot.adapters.onebot.v11 import MessageSegment
         lines = [f"【词云 Top10（近{days}天）】"]
         for i, (word, count) in enumerate(top10, 1):

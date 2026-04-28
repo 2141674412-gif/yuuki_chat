@@ -56,6 +56,7 @@ _PY_FILES = [
     "commands_admin.py", "commands_group_admin.py", "commands_update.py",
     "commands_schedule.py", "commands_backup.py", "commands_vault.py",
     "commands_sticker.py", "commands_remote.py", "commands_diagnose.py",
+    "commands_birthday.py", "commands_dongle.py",
 ]
 
 
@@ -264,7 +265,7 @@ async def _extract_update(filepath):
     # 安装第三方依赖
     try:
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-m", "pip", "install", "-q", "nonebot-plugin-parser",
+            sys.executable, "-m", "pip", "install", "-q", "--upgrade-strategy", "only-if-needed", "nonebot-plugin-parser",
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         await asyncio.wait_for(proc.communicate(), timeout=120)

@@ -109,7 +109,7 @@ def _detect_category(text: str) -> str:
 
 def _detect_type(text: str) -> str:
     """检测是收入还是支出"""
-    income_keywords = ["收入", "收到", "工资", "奖金", "红包", "报销", "赚", "到账", "+", "加"]
+    income_keywords = ["收入", "收到", "工资", "奖金", "红包", "报销", "赚", "到账", "+"]
     for kw in income_keywords:
         if kw in text:
             return "income"

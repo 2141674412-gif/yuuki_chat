@@ -9,7 +9,7 @@ from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent
 
 # 从子模块导入
-from .commands_base import check_superuser
+from .commands_base import check_superuser, _save_json, _DATA_DIR
 
 
 
@@ -175,7 +175,6 @@ _welcome_msg = "欢迎 {nickname} 加入本群~"
 def _load_welcome_config():
     global _welcome_enabled, _welcome_msg
     try:
-        from .commands_base import _DATA_DIR
         cfg_file = os.path.join(_DATA_DIR, "group_welcome.json")
         if os.path.exists(cfg_file):
             import json
@@ -246,7 +245,6 @@ _filter_action = "warn"  # "warn"=仅警告, "delete"=撤回, "ban"=撤回+禁�
 def _load_filter_config():
     global _filter_words, _filter_action
     try:
-        from .commands_base import _DATA_DIR
         cfg_file = os.path.join(_DATA_DIR, "group_filter.json")
         if os.path.exists(cfg_file):
             import json
@@ -333,11 +331,8 @@ async def _cmd_set_welcome(event: MessageEvent):
     _welcome_msg = content
     # 保存配置
     try:
-        from .commands_base import _DATA_DIR
-        import json
         cfg_file = os.path.join(_DATA_DIR, "group_welcome.json")
-        with open(cfg_file, "w", encoding="utf-8") as f:
-            json.dump({"enabled": _welcome_enabled, "message": _welcome_msg}, f, ensure_ascii=False)
+        _save_json(cfg_file, {"enabled": _welcome_enabled, "message": _welcome_msg})
     except Exception as e:
         logger.debug(f"[群管] 保存欢迎配置失败: {e}")
     await _send(event, f"...欢迎语已设置：{content}")
@@ -367,11 +362,8 @@ async def _cmd_add_filter(event: MessageEvent):
         _filter_words.append(content.lower())
     # 保存
     try:
-        from .commands_base import _DATA_DIR
-        import json
         cfg_file = os.path.join(_DATA_DIR, "group_filter.json")
-        with open(cfg_file, "w", encoding="utf-8") as f:
-            json.dump({"words": _filter_words, "action": _filter_action}, f, ensure_ascii=False)
+        _save_json(cfg_file, {"words": _filter_words, "action": _filter_action})
     except Exception as e:
         logger.debug(f"[群管] 保存过滤词失败: {e}")
     await _send(event, f"...已添加过滤词：{content}（共{len(_filter_words)}个）")
@@ -393,11 +385,8 @@ async def _cmd_del_filter(event: MessageEvent):
     if word_lower in _filter_words:
         _filter_words.remove(word_lower)
         try:
-            from .commands_base import _DATA_DIR
-            import json
             cfg_file = os.path.join(_DATA_DIR, "group_filter.json")
-            with open(cfg_file, "w", encoding="utf-8") as f:
-                json.dump({"words": _filter_words, "action": _filter_action}, f, ensure_ascii=False)
+            _save_json(cfg_file, {"words": _filter_words, "action": _filter_action})
         except Exception as e:
             logger.debug(f"[群管] 保存过滤词失败: {e}")
         await _send(event, f"...已删除过滤词：{content}（剩余{len(_filter_words)}个）")
@@ -425,11 +414,8 @@ async def _cmd_filter_mode(event: MessageEvent):
     if content in ("warn", "delete", "ban"):
         _filter_action = content
         try:
-            from .commands_base import _DATA_DIR
-            import json
             cfg_file = os.path.join(_DATA_DIR, "group_filter.json")
-            with open(cfg_file, "w", encoding="utf-8") as f:
-                json.dump({"words": _filter_words, "action": _filter_action}, f, ensure_ascii=False)
+            _save_json(cfg_file, {"words": _filter_words, "action": _filter_action})
         except Exception as e:
             logger.debug(f"[群管] 保存过滤模式失败: {e}")
         mode_names = {"warn": "仅通知", "delete": "撤回", "ban": "撤回+禁言"}

@@ -212,6 +212,14 @@ async def _check_birthdays():
     tomorrow_str = tomorrow.strftime("%m-%d")
     date_key = today.strftime("%Y-%m-%d")
 
+    # 清理超过30天的旧祝福记录
+    from datetime import timedelta as _td
+    cutoff = today - _td(days=30)
+    cutoff_str = cutoff.strftime("%Y-%m-%d")
+    for old_key in list(_blessed.keys()):
+        if old_key < cutoff_str:
+            del _blessed[old_key]
+
     if date_key not in _blessed:
         _blessed[date_key] = {}
 

@@ -42,7 +42,9 @@ async def _send(event, msg):
 
 
 async def _cmd_remind(event: MessageEvent):
-    content = str(event.message).replace("提醒", "").strip()
+    content = str(event.message).strip()
+    if content.startswith("提醒"):
+        content = content[len("提醒"):].strip()
 
     if not content:
         await _send(event, "提醒你什么。说清楚。格式：/提醒 5分钟 写作业")
@@ -102,7 +104,9 @@ reminders_cmd = _register("历史", _cmd_reminders)
 # -- 取消提醒 --
 
 async def _cmd_cancel_remind(event: MessageEvent):
-    remind_id_str = str(event.message).replace("取消提醒", "").strip()
+    remind_id_str = str(event.message).strip()
+    if remind_id_str.startswith("取消提醒"):
+        remind_id_str = remind_id_str[len("取消提醒"):].strip()
 
     if not remind_id_str:
         await _send(event, "取消哪个。说序号。")

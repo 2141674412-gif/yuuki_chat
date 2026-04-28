@@ -156,6 +156,8 @@ async def _cmd_translate(event: MessageEvent):
                 # 取到结果，取消其他未完成任务
                 for p in pending:
                     p.cancel()
+                if pending:
+                    await asyncio.gather(*pending, return_exceptions=True)
                 _save_to_cache(result)
                 await _send(event, f"{text_to_translate}\n→ {result}")
                 _sent = True

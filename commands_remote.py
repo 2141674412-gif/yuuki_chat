@@ -70,7 +70,9 @@ async def _cmd_run(event: MessageEvent):
 
     try:
         # 使用shell=False防止shell注入，但需要手动解析命令
-        # 对于简单命令直接用exec，管道等复杂命令仍用shell（管理员信任）
+        # 注意：此处的 shell 特性检测是基于字符匹配的启发式方法，
+        # 可能存在误判（例如命令参数中合法包含 | 或 & 字符）。
+        # 由于仅限管理员使用，风险可控。
         if any(c in content for c in ('|', '&&', '||', '>', '<', '$(', '`')):
             # 包含shell特性的命令，使用shell（管理员已验证）
             proc = await asyncio.create_subprocess_shell(
