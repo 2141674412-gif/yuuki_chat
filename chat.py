@@ -200,7 +200,16 @@ def _update_user_profile(user_id: str, message: str):
 
     # 好感度系统
     if "affinity" not in profile:
-        profile["affinity"] = 0  # 初始好感度0
+        # 旧用户迁移：根据历史互动次数推算初始好感度
+        mentioned = profile.get("mentioned_count", 0)
+        if mentioned >= 100:
+            profile["affinity"] = 60
+        elif mentioned >= 50:
+            profile["affinity"] = 40
+        elif mentioned >= 20:
+            profile["affinity"] = 20
+        else:
+            profile["affinity"] = 5
     if "interaction_count" not in profile:
         profile["interaction_count"] = 0
     profile["interaction_count"] += 1
