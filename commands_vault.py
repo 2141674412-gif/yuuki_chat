@@ -317,8 +317,10 @@ async def _cmd_vault_save(event: MessageEvent):
         value_part = parts[1] if len(parts) >= 2 else ""
     else:
         after_pipe = content[pipe_idx+1:].strip()
-        pw_len = len(after_pipe.split(None, 1)[0]) if after_pipe else 0
-        value_part = after_pipe[pw_len:].strip() if after_pipe else ""
+        # 密码是|后第一个token，内容是剩余部分
+        parts = after_pipe.split(None, 1)
+        pw_len = len(parts[0]) if parts else 0
+        value_part = parts[1] if len(parts) >= 2 else ""
     if not name or not value_part:
         await _send(event, "...格式不对。/存 密码名|密码 内容")
         return

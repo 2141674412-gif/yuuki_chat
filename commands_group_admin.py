@@ -272,6 +272,10 @@ async def _on_keyword_filter(bot: Bot, event: _GME):
     # 管理员不受过滤
     if str(event.user_id) in superusers:
         return
+    # 黑名单用户不受过滤（已不处理）
+    from .commands_base import user_blacklist
+    if str(event.user_id) in user_blacklist:
+        return
 
     text = str(event.message).lower()
     for word in _filter_words:
