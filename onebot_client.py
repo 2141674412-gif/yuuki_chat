@@ -217,14 +217,18 @@ class OneBotClient:
     async def connect(self):
         """启动客户端, 连接 WebSocket 并开始事件循环"""
         self._running = True
-        log.info(f"正在连接 {self.ws_url} ...")
-        # 构建连接参数
+        # 构建连接参数（同时支持header和URL参数两种token方式）
         extra_headers = {}
+        connect_url = self.ws_url
         if self.access_token:
             extra_headers["Authorization"] = f"Bearer {self.access_token}"
+            # 同时在URL上加token参数（NapCat兼容两种方式）
+            sep = "&" if "?" in connect_url else "?"
+            connect_url = f"{connect_url}{sep}access_token={self.access_token}"
+        log.info(f"正在连接 {connect_url} ...")
         while self._running:
             try:
-                async with websockets.connect(self.ws_url, additional_headers=extra_headers) as ws:
+                async with websockets.connect(connect_url, additional_headers=extra_headers) as ws:
                     self._ws = ws
                     log.info("WebSocket 连接成功")
                     await self._recv_loop(ws)
