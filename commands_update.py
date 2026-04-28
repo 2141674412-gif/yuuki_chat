@@ -228,16 +228,20 @@ def _restore_backup():
 
 
 async def _extract_update(filepath):
-    """解压更新包，返回更新的文件数"""
+    """解压更新包到临时目录，返回更新文件列表和临时目录路径"""
+    import tempfile
     plugin_dir = _get_plugin_dir()
     plugin_dir_real = os.path.realpath(plugin_dir)
-    extract_count = 0
+    file_list = []
+
+    # 解压到临时目录，避免Windows文件锁问题
+    tmp_dir = tempfile.mkdtemp(prefix="yuuki_update_")
 
     with zipfile.ZipFile(filepath, "r") as zf:
         for name in zf.namelist():
             if name.endswith("/") or name.endswith("\\") or os.path.basename(name).startswith("."):
                 continue
-            if not (name.endswith(".py") or name.startswith("assets/")):
+            if not (name.endswith(".py") or name.endswith(".json") or name.startswith("assets/")):
                 continue
 
             if name.endswith(".py"):
@@ -250,17 +254,12 @@ async def _extract_update(filepath):
                 logger.warning(f"[更新] 跳过非法路径: {name}")
                 continue
 
-            os.makedirs(os.path.dirname(target), exist_ok=True)
-            with zf.open(name) as src, open(target, "wb") as dst:
+            # 解压到临时目录
+            tmp_target = os.path.join(tmp_dir, name)
+            os.makedirs(os.path.dirname(tmp_target), exist_ok=True)
+            with zf.open(name) as src, open(tmp_target, "wb") as dst:
                 dst.write(src.read())
-            extract_count += 1
-
-    # 清理旧文件
-    for old in ["commands.py", "commands_bilibili.py"]:
-        old_path = os.path.join(plugin_dir, old)
-        if os.path.exists(old_path):
-            os.remove(old_path)
-            extract_count += 1
+            file_list.append((name, target))
 
     # 安装第三方依赖
     try:
@@ -272,6 +271,37 @@ async def _extract_update(filepath):
         logger.info("[更新] 已安装 nonebot-plugin-parser")
     except Exception as e:
         logger.warning(f"[更新] 安装依赖失败: {e}")
+
+    return file_list, tmp_dir
+
+
+def _apply_update(file_list, tmp_dir):
+    """从临时目录复制文件到插件目录（在重启前调用）"""
+    import shutil
+    plugin_dir = _get_plugin_dir()
+    extract_count = 0
+
+    for name, target in file_list:
+        tmp_target = os.path.join(tmp_dir, name)
+        try:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            shutil.copy2(tmp_target, target)
+            extract_count += 1
+        except Exception as e:
+            logger.warning(f"[更新] 复制失败 {name}: {e}")
+
+    # 清理旧文件
+    for old in ["commands.py", "commands_bilibili.py"]:
+        old_path = os.path.join(plugin_dir, old)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+            extract_count += 1
+
+    # 清理临时目录
+    try:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+    except Exception:
+        pass
 
     return extract_count
 
@@ -404,14 +434,21 @@ async def _cmd_update(event: MessageEvent):
         await _send("...正在备份...")
         _backup_current()
 
-        # 8. 解压
+        # 8. 解压到临时目录（避免Windows文件锁）
         await _send("...正在更新文件...")
-        extract_count = await _extract_update(update_zip)
+        file_list, tmp_dir = await _extract_update(update_zip)
+        extract_count = len(file_list)
 
-        # 9. 保存版本
+        # 9. 保存版本和待应用更新信息
         _save_version(remote_tag)
+        # 保存临时目录路径，供启动时应用
+        try:
+            with open(os.path.join(os.path.dirname(_get_plugin_dir()), "_pending_update.json"), "w") as f:
+                json.dump({"tmp_dir": tmp_dir, "files": [(n, t) for n, t in file_list]}, f)
+        except Exception:
+            pass
 
-        # 10. 清理
+        # 10. 清理zip和锁
         for f in [update_zip, _UPDATE_LOCK]:
             try:
                 os.remove(f)
@@ -423,7 +460,7 @@ async def _cmd_update(event: MessageEvent):
 
         await _send(f"...更新完成！{remote_tag}，{extract_count} 个文件。正在重启...")
 
-        # 12. 重启
+        # 12. 重启（启动时会从临时目录复制文件）
         err = _do_restart(user_id, event)
         if err:
             await _send(f"...更新成功但重启失败：{err}，请手动重启。")

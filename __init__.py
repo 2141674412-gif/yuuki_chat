@@ -24,6 +24,31 @@ NoneBot2 插件，基于 Ollama 本地 AI 的聊天机器人
   maimai.py   - 舞萌DX查询（B50/B40/单曲）
 """
 
+# === 启动时应用待处理的更新（Windows文件锁修复）===
+import os as _os, json as _json, shutil as _shutil
+_pending = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "_pending_update.json")
+_pending = _os.path.normpath(_pending)
+if _os.path.isfile(_pending):
+    try:
+        with open(_pending, "r") as _f:
+            _info = _json.load(_f)
+        _tmp = _info.get("tmp_dir", "")
+        _files = _info.get("files", [])
+        if _tmp and _os.path.isdir(_tmp):
+            for _name, _target in _files:
+                _src = _os.path.join(_tmp, _name)
+                if _os.path.isfile(_src):
+                    _os.makedirs(_os.path.dirname(_target), exist_ok=True)
+                    _shutil.copy2(_src, _target)
+            _shutil.rmtree(_tmp, ignore_errors=True)
+        _os.remove(_pending)
+    except Exception:
+        try:
+            _os.remove(_pending)
+        except Exception:
+            pass
+# === 更新应用完毕 ===
+
 import time
 
 from nonebot import get_driver, logger
