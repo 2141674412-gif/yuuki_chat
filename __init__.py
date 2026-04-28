@@ -31,19 +31,27 @@ from .config import ALLOWED_GROUPS
 
 # 过滤非白名单群的消息日志，减少终端噪音
 def _filter_non_whitelist(record):
-    msg = record["message"]
+    msg = str(record["message"])
     if "群:" in msg and ALLOWED_GROUPS:
         import re as _re
         m = _re.search(r'群:(\d+)', msg)
         if m:
             gid = int(m.group(1))
             if gid not in ALLOWED_GROUPS:
+                record["message"] = ""  # 清空消息内容
                 return False
     return True
 
+# patch loguru的默认handler，添加filter
 import sys as _sys
-logger.remove(_sys.stderr)
-logger.add(_sys.stderr, filter=_filter_non_whitelist)
+try:
+    _logger_core = logger._core
+    for _h in _logger_core.handlers.values():
+        if hasattr(_h, '_sink') and hasattr(_h._sink, '_stream') and _h._sink._stream is _sys.stderr:
+            _h._filter = _filter_non_whitelist
+            break
+except Exception:
+    pass
 from . import chat
 from . import commands_base
 from . import commands_fun
