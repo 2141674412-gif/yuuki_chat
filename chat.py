@@ -155,6 +155,36 @@ _GROUP_CHAT_LOG_TTL = 7 * 24 * 3600  # 保留最近 7 天的数据（秒）
 _user_profiles = {}  # {user_id: {"topics": [...], "mentioned_count": int, "last_active": float}}
 _PROFILE_FILE = os.path.join(DATA_DIR, "user_profiles.json")
 
+# ========== 全局消息发送速率限制 ==========
+_send_times: list[float] = []  # 记录最近发送时间戳
+_RATE_LIMIT_5S = 3   # 5秒内最多3条
+_RATE_LIMIT_60S = 20  # 60秒内最多20条
+
+async def _rate_limited_send(matcher, message: str):
+    """带速率限制的消息发送"""
+    now = time.time()
+    # 清理过期记录
+    _send_times[:] = [t for t in _send_times if now - t < 60]
+    # 检查限制
+    recent_5s = sum(1 for t in _send_times if now - t < 5)
+    if recent_5s >= _RATE_LIMIT_5S:
+        await asyncio.sleep(2)  # 等待2秒
+    if len(_send_times) >= _RATE_LIMIT_60S:
+        await asyncio.sleep(5)  # 等待5秒
+    _send_times.append(time.time())
+    try:
+        await matcher.send(message)
+    except Exception:
+        pass
+
+# ========== 插话冷却 ==========
+_last_chatter_time: dict[int, float] = {}  # {group_id: timestamp}
+_CHATTER_COOLDOWN = 60  # 同一群60秒内最多插话一次
+
+# ========== 错误静默 ==========
+_consecutive_errors = 0
+_error_silence_until = 0.0
+
 def _load_user_profiles():
     global _user_profiles
     try:
@@ -681,11 +711,12 @@ async def handle_chat(event: MessageEvent):
         sticker_msg = get_sticker_message(ai_response)
         if sticker_msg:
             try:
-                await chat.send(sticker_msg)
+                await _rate_limited_send(chat, sticker_msg)
             except Exception:
                 pass
 
-        await chat.send(ai_response)
+        _consecutive_errors = 0
+        await _rate_limited_send(chat, ai_response)
 
     except FinishedException:
         raise
@@ -696,18 +727,30 @@ async def handle_chat(event: MessageEvent):
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
             chat_history[user_id].pop()
         _update_user_profile(user_id, message)
+        _consecutive_errors += 1
+        if _consecutive_errors > 3:
+            _error_silence_until = time.time() + 300  # 静默5分钟
+            return
+        if time.time() < _error_silence_until:
+            return
         fallback = random.choice([
             "嗯...走神了，再说一次？",
             "...等一下，我刚才在想事情。",
             "啊，抱歉，刚才没听到。",
             "哼...别催，我在想。",
         ])
-        await chat.send(fallback)
+        await _rate_limited_send(chat, fallback)
     except APIError as e:
         # API 错误（如服务不可用、速率限制等）
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
             chat_history[user_id].pop()
         _update_user_profile(user_id, message)
+        _consecutive_errors += 1
+        if _consecutive_errors > 3:
+            _error_silence_until = time.time() + 300  # 静默5分钟
+            return
+        if time.time() < _error_silence_until:
+            return
         fallback = random.choice([
             "唔...脑袋好像有点转不过来，等一下再来吧。",
             "...现在有点不舒服，等会儿再说。",
@@ -715,12 +758,18 @@ async def handle_chat(event: MessageEvent):
             "嗯...好像哪里出了问题。",
             "...算了，等一下再说吧。",
         ])
-        await chat.send(fallback)
+        await _rate_limited_send(chat, fallback)
     except Exception as e:
         # 其他未预期的错误
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
             chat_history[user_id].pop()
         _update_user_profile(user_id, message)
+        _consecutive_errors += 1
+        if _consecutive_errors > 3:
+            _error_silence_until = time.time() + 300  # 静默5分钟
+            return
+        if time.time() < _error_silence_until:
+            return
         fallback = [
             "嗯？怎么了。",
             "...有事就说。",
@@ -730,7 +779,7 @@ async def handle_chat(event: MessageEvent):
         ]
 
         ai_response = random.choice(fallback)
-        await chat.send(ai_response)
+        await _rate_limited_send(chat, ai_response)
 
 
 # ========== AI 生成回复 ==========
@@ -881,6 +930,11 @@ async def handle_chatter(event: GroupMessageEvent):
     if event.group_id not in ALLOWED_GROUPS:
         return
 
+    # 插话冷却检查
+    now = time.time()
+    if event.group_id in _last_chatter_time and now - _last_chatter_time[event.group_id] < _CHATTER_COOLDOWN:
+        return
+
     # 跳过包含图片的消息（交给识图handler处理）
     if any(seg.type == "image" for seg in event.message):
         return
@@ -906,7 +960,8 @@ async def handle_chatter(event: GroupMessageEvent):
             return
         reply = await _ai_generate_reply(message, _MENTIONED_SYSTEM_PROMPT)
         if reply:
-            await chatter.send(reply)
+            await _rate_limited_send(chatter, reply)
+            _last_chatter_time[event.group_id] = time.time()
         return
 
     # 计算插话概率：基础概率 + 话题关键词加成
@@ -927,10 +982,12 @@ async def handle_chatter(event: GroupMessageEvent):
     else:
         enhanced_prompt = _CHATTER_SYSTEM_PROMPT
     reply = await _ai_generate_reply(message, enhanced_prompt)
+    # AI生成失败时静默，不发固定话题
     if not reply:
-        reply = random.choice(_FALLBACK_TOPICS)
+        return
 
-    await chatter.send(reply)
+    await _rate_limited_send(chatter, reply)
+    _last_chatter_time[event.group_id] = time.time()
 
 
 # ========== 自动识别二维码 ==========
@@ -1760,6 +1817,16 @@ async def _auto_chat_loop():
 
             # 发送消息
             try:
+                # 速率限制检查
+                now_auto = time.time()
+                _send_times[:] = [t for t in _send_times if now_auto - t < 60]
+                recent_5s_auto = sum(1 for t in _send_times if now_auto - t < 5)
+                if recent_5s_auto >= _RATE_LIMIT_5S:
+                    await asyncio.sleep(2)
+                if len(_send_times) >= _RATE_LIMIT_60S:
+                    await asyncio.sleep(5)
+                _send_times.append(time.time())
+
                 bot = get_bot()
                 await bot.call_api(
                     "send_group_msg",
