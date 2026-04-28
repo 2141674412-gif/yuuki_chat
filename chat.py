@@ -517,6 +517,21 @@ async def handle_chat(event: MessageEvent):
     if re.search(r'bilibili\.com/video/|b23\.tv/', plain_text):
         return
 
+    # 过滤无意义消息：纯表情、纯标点、过短无内容
+    # 去掉所有表情字符后检查剩余内容
+    import unicodedata
+    text_no_emoji = ''.join(
+        c for c in plain_text
+        if unicodedata.category(c) not in ('So', 'Sk', 'Sc')  # Symbol other/Modifier/ Currency
+    ).strip()
+    text_no_punct = re.sub(r'[^\w\u4e00-\u9fff]', '', text_no_emoji).strip()
+    if not text_no_punct and len(plain_text) <= 20:
+        # 纯表情/标点消息，不调AI
+        return
+    if len(text_no_punct) <= 1 and not any(kw in plain_text for kw in ["希亚", "noa", "Noa"]):
+        # 单个字且不是叫bot名字，跳过
+        return
+
     # 记录群消息到 _group_chat_log（用于词云统计）
     if hasattr(event, 'group_id') and event.group_id:
         if event.group_id in ALLOWED_GROUPS and plain_text:
@@ -605,10 +620,22 @@ async def handle_chat(event: MessageEvent):
             return ai_response
 
         # 流式请求总超时保护（防止服务端断开后无限等待）
-        ai_response = await asyncio.wait_for(
-            loop.run_in_executor(None, _collect_stream),
-            timeout=90.0
-        )
+        try:
+            ai_response = await asyncio.wait_for(
+                loop.run_in_executor(None, _collect_stream),
+                timeout=90.0
+            )
+        except (APITimeoutError, APIError, Exception) as first_err:
+            # 第一次失败，自动重试一次
+            logger.info(f"[聊天] API调用失败，自动重试: {type(first_err).__name__}")
+            await asyncio.sleep(1)  # 等1秒再重试
+            try:
+                ai_response = await asyncio.wait_for(
+                    loop.run_in_executor(None, _collect_stream),
+                    timeout=90.0
+                )
+            except Exception:
+                raise first_err  # 重试也失败，抛出原始错误
 
         # 检查history是否在等待期间被清理
         if user_id not in chat_history:
@@ -669,14 +696,25 @@ async def handle_chat(event: MessageEvent):
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
             chat_history[user_id].pop()
         _update_user_profile(user_id, message)
-        fallback = "嗯...正义的伙伴好像走神了，再说一次？"
+        fallback = random.choice([
+            "嗯...走神了，再说一次？",
+            "...等一下，我刚才在想事情。",
+            "啊，抱歉，刚才没听到。",
+            "哼...别催，我在想。",
+        ])
         await chat.send(fallback)
     except APIError as e:
         # API 错误（如服务不可用、速率限制等）
         if user_id in chat_history and chat_history[user_id] and chat_history[user_id][-1]["role"] == "user":
             chat_history[user_id].pop()
         _update_user_profile(user_id, message)
-        fallback = "唔...脑袋好像有点转不过来，等一下再来吧。"
+        fallback = random.choice([
+            "唔...脑袋好像有点转不过来，等一下再来吧。",
+            "...现在有点不舒服，等会儿再说。",
+            "正义的伙伴暂时无法思考...",
+            "嗯...好像哪里出了问题。",
+            "...算了，等一下再说吧。",
+        ])
         await chat.send(fallback)
     except Exception as e:
         # 其他未预期的错误
@@ -687,7 +725,6 @@ async def handle_chat(event: MessageEvent):
             "嗯？怎么了。",
             "...有事就说。",
             "哼。",
-            "正义的伙伴现在有点忙。",
             "...你继续说。",
             "怎么了，有什么事吗。",
         ]
