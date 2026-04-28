@@ -56,7 +56,7 @@ _PY_FILES = [
     "commands_admin.py", "commands_group_admin.py", "commands_update.py",
     "commands_schedule.py", "commands_backup.py", "commands_vault.py",
     "commands_sticker.py", "commands_remote.py", "commands_diagnose.py",
-    "commands_birthday.py", "commands_dongle.py",
+    "commands_birthday.py", "commands_dongle.py", "onebot_client.py",
 ]
 
 
