@@ -444,6 +444,7 @@ async def _on_startup_heartbeat():
                                 group_id=int(gid),
                                 message=f"...刚才好像断线了 {gap/60:.1f} 分钟，现在已恢复。"
                             )
+                            await asyncio.sleep(1)
                         except Exception:
                             pass
     except Exception as e:

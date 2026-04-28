@@ -2,6 +2,7 @@
 
 # 标准库
 import re
+import time
 
 # 第三方库
 from nonebot import on_command, on_notice, on_message, logger
@@ -224,6 +225,8 @@ async def _on_group_increase(bot: Bot, event: GroupIncreaseNoticeEvent):
 
 # ========== 关键词过滤 ==========
 
+_last_filter_notify: dict[int, float] = {}  # 群级通知冷却时间戳
+
 _filter_words = [
     # 违规/敏感词
     "赌博", "代练", "刷单", "色情", "约炮", "嫖娼",
@@ -292,12 +295,16 @@ async def _on_keyword_filter(bot: Bot, event: _GME):
                     )
                 except Exception as e:
                     logger.debug(f"[群管] 禁言失败: {e}")
-            # 通知管理员
+            # 通知管理员（群级30秒冷却）
+            now_ts = time.time()
+            if now_ts - _last_filter_notify.get(gid, 0) < 30:
+                return
             try:
                 await bot.send_group_msg(
                     group_id=gid,
                     message=f"[关键词过滤] 检测到违规内容，已处理。\n用户: {event.user_id} | 匹配: {word}"
                 )
+                _last_filter_notify[gid] = now_ts
             except Exception as e:
                 logger.debug(f"[群管] 通知管理员失败: {e}")
             return

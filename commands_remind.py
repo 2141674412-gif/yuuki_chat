@@ -1,6 +1,7 @@
 # 提醒模块
 
 from datetime import datetime, timedelta
+import asyncio
 import re
 
 from nonebot.adapters.onebot.v11 import MessageEvent
@@ -164,6 +165,7 @@ async def _check_reminders():
                     message=f"到点了。{r['content']}。",
                 )
                 logger.info(f"[提醒] 已向用户 {user_id} 发送提醒：{r['content']}")
+                await asyncio.sleep(0.5)
             except Exception as e:
                 logger.warning(f"[提醒] 向用户 {user_id} 发送私聊提醒失败：{e}，尝试群消息发送")
                 # 私聊失败，尝试发送到已知群
@@ -178,6 +180,7 @@ async def _check_reminders():
                             )
                             logger.info(f"[提醒] 已通过群 {gid} 向用户 {user_id} 发送提醒")
                             sent = True
+                            await asyncio.sleep(0.5)
                             break
                         except Exception:
                             continue

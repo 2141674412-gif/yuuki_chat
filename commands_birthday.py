@@ -1,5 +1,6 @@
 # 生日提醒模块
 
+import asyncio
 import os
 import random
 import time
@@ -257,6 +258,7 @@ async def _check_birthdays():
                     await bot.send_group_msg(group_id=int(gid), message=msg)
                     logger.info(f"[生日] 已向群{gid}祝福 {name}({uid})")
                     _blessed[date_key][gid].append(uid)
+                    await asyncio.sleep(1)
                 except Exception as e:
                     logger.error(f"[生日] 祝福发送失败: 群{gid} {e}")
                     # 群无效则清理
@@ -270,6 +272,7 @@ async def _check_birthdays():
                     await bot.send_group_msg(group_id=int(gid), message=msg)
                     logger.info(f"[生日] 已向群{gid}提前提醒 {name}({uid})的生日")
                     _blessed[date_key][gid].append(uid)
+                    await asyncio.sleep(1)
                 except Exception as e:
                     logger.error(f"[生日] 提醒发送失败: 群{gid} {e}")
                     _blessed[date_key][gid].append(uid)
