@@ -724,8 +724,9 @@ async def handle_chatter(event: GroupMessageEvent):
 _qrcode = on_message(priority=3, block=False)
 
 _qr_detector = QReader()
-# 正在处理中的二维码message_id -> asyncio.Event
-_qr_processing = {}
+# 已被二维码handler处理并回复的message_id（任何二维码，不只是SGWCMAID）
+_qr_handled = set()
+_QR_HANDLED_MAX = 500
 
 @_qrcode.handle()
 async def handle_qrcode(event: MessageEvent):
@@ -739,9 +740,6 @@ async def handle_qrcode(event: MessageEvent):
             url = seg.data.get("url", "")
             if not url:
                 continue
-            # 标记此消息正在被二维码handler处理
-            evt = asyncio.Event()
-            _qr_processing[event.message_id] = evt
             try:
                 logger.debug(f"[二维码] 检测到图片，正在下载: {url[:60]}...")
                 try:
@@ -766,20 +764,20 @@ async def handle_qrcode(event: MessageEvent):
                     text = ""
                 text = text.strip()
                 if text:
-                    # 如果是SGWCMAID开头的二维码，回复识别结果
+                    # 标记此消息已被二维码handler处理
+                    _qr_handled.add(event.message_id)
+                    if len(_qr_handled) > _QR_HANDLED_MAX:
+                        _qr_handled.clear()
                     if text.startswith("SGWCMAID"):
                         logger.debug(f"[二维码] 检测到SGWCMAID: {event.message_id}")
                         await _qrcode.send(f"识别到机台二维码：\n{text}")
-                        evt.set()  # 通知识图handler跳过
-                        raise FinishedException
                     else:
                         await _qrcode.send(f"识别到二维码：\n{text}")
+                    raise FinishedException
             except FinishedException:
                 raise
             except Exception as e:
                 logger.warning(f"[二维码] 识别异常: {e}")
-            finally:
-                _qr_processing.pop(event.message_id, None)
 
 
 # ========== B站视频卡片 ==========
@@ -1103,18 +1101,16 @@ async def handle_image_chat(event: MessageEvent):
                 logger.warning(f"[图片理解] 图片segment数据: {seg.data}")
         return
 
-    # 如果二维码handler正在处理此消息，等待其完成后再决定是否跳过
-    qr_evt = _qr_processing.get(event.message_id)
-    if qr_evt:
-        # 等待二维码handler处理完毕（最多5秒）
-        try:
-            await asyncio.wait_for(qr_evt.wait(), timeout=5.0)
-        except asyncio.TimeoutError:
-            pass
-        # 二维码handler已set event，说明是机台二维码，跳过识图
-        if qr_evt.is_set():
-            logger.debug(f"[图片理解] 跳过：二维码handler已处理 message_id={event.message_id}")
-            return
+    # 如果二维码handler已处理此消息，跳过识图
+    # 短暂等待（二维码handler优先级更高，但NoneBot并发启动handler）
+    if event.message_id in _qr_handled:
+        logger.debug(f"[图片理解] 跳过：二维码handler已处理 message_id={event.message_id}")
+        return
+    # 等待一小段时间，让二维码handler有机会先完成
+    await asyncio.sleep(0.5)
+    if event.message_id in _qr_handled:
+        logger.debug(f"[图片理解] 跳过（延迟检测）：二维码handler已处理 message_id={event.message_id}")
+        return
 
     # 截图记账去重：同一张图片不重复记账
     _accounting_seen_key = None
