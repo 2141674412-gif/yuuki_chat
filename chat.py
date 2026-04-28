@@ -209,9 +209,55 @@ def _update_user_profile(user_id: str, message: str):
     if user_id == _get_owner_qq():
         profile["affinity"] = 100
     else:
-        # 每次互动+1好感度，上限99（100是主人专属）
-        if profile["affinity"] < 99:
-            profile["affinity"] = min(99, profile["affinity"] + 1)
+        msg_lower = message.lower()
+
+        # === 好感度增减（基于希亚的性格特点） ===
+        delta = 0
+
+        # --- 大幅增加好感 ---
+        # 夸希亚
+        if any(w in msg_lower for w in ["可爱", "好可爱", "最可爱", "卡哇伊", "kawaii"]):
+            delta += 3  # 表面不在意但心里开心
+        # 送/提到希亚喜欢的东西
+        if any(w in msg_lower for w in ["芭菲", "巴菲", "parfait", "猫", "猫咪", "猫猫", "甜点", "蛋糕", "冰淇淋", "巧克力"]):
+            delta += 3
+        # 关心希亚
+        if any(w in msg_lower for w in ["希亚你", "你累吗", "辛苦了", "注意休息", "别太累", "早安希亚", "晚安希亚"]):
+            delta += 2
+        # 叫希亚的名字（亲密感）
+        if any(w in msg_lower for w in ["希亚", "小希亚", "noa"]):
+            delta += 1
+        # 聊希亚感兴趣的话题
+        if any(w in msg_lower for w in ["舞萌", "maimai", "音游", "动漫", "游戏", "猫"]):
+            delta += 1
+        # 和希亚一起吐槽/共鸣
+        if any(w in msg_lower for w in ["确实", "同意", "对啊", "哈哈", "笑死", "太真实"]):
+            delta += 1
+
+        # --- 大幅降低好感 ---
+        # 说希亚矮/身高相关（雷点！）
+        if any(w in msg_lower for w in ["小矮子", "矮冬瓜", "身高146", "一米四", "好矮", "长不高", "萝莉", "小学生"]):
+            delta -= 5  # 非常生气
+        # 叫希亚奇怪的外号
+        if any(w in msg_lower for w in ["正义的伙伴", "帕菲女王"]):
+            delta -= 3  # 烦死了别这么叫
+        # 提到希亚讨厌的东西
+        if any(w in msg_lower for w in ["虫", "蟑螂", "蜘蛛", "恐怖片", "鬼故事"]):
+            delta -= 2  # 不舒服
+        # 命令/使唤语气
+        if any(w in msg_lower for w in ["给我", "快点", "赶紧", "闭嘴", "滚", "笨蛋", "白痴"]):
+            delta -= 2
+        # 无视/冷淡
+        if len(message.strip()) <= 2 and not any(w in msg_lower for w in ["早", "晚安", "嗨", "嗯"]):
+            delta -= 1  # 太冷淡了
+
+        # --- 基础互动 ---
+        if delta == 0:
+            delta = 1  # 普通互动+1
+
+        # 应用好感度变化
+        old_affinity = profile["affinity"]
+        profile["affinity"] = max(0, min(99, profile["affinity"] + delta))
 
         # 长时间不互动好感度衰减（超过24小时没互动，每次-1）
         if profile["last_active"] > 0:
