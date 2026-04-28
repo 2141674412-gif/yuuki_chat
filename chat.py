@@ -724,6 +724,8 @@ async def handle_chatter(event: GroupMessageEvent):
 _qrcode = on_message(priority=3, block=False)
 
 _qr_detector = QReader()
+# 正在处理中的二维码message_id -> asyncio.Event
+_qr_processing = {}
 
 @_qrcode.handle()
 async def handle_qrcode(event: MessageEvent):
@@ -737,6 +739,9 @@ async def handle_qrcode(event: MessageEvent):
             url = seg.data.get("url", "")
             if not url:
                 continue
+            # 标记此消息正在被二维码handler处理
+            evt = asyncio.Event()
+            _qr_processing[event.message_id] = evt
             try:
                 logger.debug(f"[二维码] 检测到图片，正在下载: {url[:60]}...")
                 try:
@@ -765,6 +770,7 @@ async def handle_qrcode(event: MessageEvent):
                     if text.startswith("SGWCMAID"):
                         logger.debug(f"[二维码] 检测到SGWCMAID: {event.message_id}")
                         await _qrcode.send(f"识别到机台二维码：\n{text}")
+                        evt.set()  # 通知识图handler跳过
                         raise FinishedException
                     else:
                         await _qrcode.send(f"识别到二维码：\n{text}")
@@ -772,6 +778,8 @@ async def handle_qrcode(event: MessageEvent):
                 raise
             except Exception as e:
                 logger.warning(f"[二维码] 识别异常: {e}")
+            finally:
+                _qr_processing.pop(event.message_id, None)
 
 
 # ========== B站视频卡片 ==========
@@ -1094,6 +1102,19 @@ async def handle_image_chat(event: MessageEvent):
             if seg.type == "image":
                 logger.warning(f"[图片理解] 图片segment数据: {seg.data}")
         return
+
+    # 如果二维码handler正在处理此消息，等待其完成后再决定是否跳过
+    qr_evt = _qr_processing.get(event.message_id)
+    if qr_evt:
+        # 等待二维码handler处理完毕（最多5秒）
+        try:
+            await asyncio.wait_for(qr_evt.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            pass
+        # 二维码handler已set event，说明是机台二维码，跳过识图
+        if qr_evt.is_set():
+            logger.debug(f"[图片理解] 跳过：二维码handler已处理 message_id={event.message_id}")
+            return
 
     # 截图记账去重：同一张图片不重复记账
     _accounting_seen_key = None
