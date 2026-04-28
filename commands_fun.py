@@ -705,11 +705,13 @@ async def _cmd_affinity(event: MessageEvent):
     from .chat import _user_profiles
     uid = str(event.user_id)
     profile = _user_profiles.get(uid, {})
-    affinity = profile.get("affinity", 50)
+    affinity = profile.get("affinity", 0)
     interactions = profile.get("interaction_count", 0)
     name = profile.get("name", "")
 
-    if affinity >= 80:
+    if affinity >= 100:
+        level = "💖 主人"
+    elif affinity >= 80:
         level = "💕 非常亲密"
     elif affinity >= 60:
         level = "😊 关系不错"

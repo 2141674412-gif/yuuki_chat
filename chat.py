@@ -200,21 +200,25 @@ def _update_user_profile(user_id: str, message: str):
 
     # 好感度系统
     if "affinity" not in profile:
-        profile["affinity"] = 50  # 初始好感度50
+        profile["affinity"] = 0  # 初始好感度0
     if "interaction_count" not in profile:
         profile["interaction_count"] = 0
     profile["interaction_count"] += 1
 
-    # 每次互动+1好感度，上限100
-    if profile["affinity"] < 100:
-        profile["affinity"] = min(100, profile["affinity"] + 1)
+    # 主人好感度固定100，不衰减
+    if user_id == _get_owner_qq():
+        profile["affinity"] = 100
+    else:
+        # 每次互动+1好感度，上限99（100是主人专属）
+        if profile["affinity"] < 99:
+            profile["affinity"] = min(99, profile["affinity"] + 1)
 
-    # 长时间不互动好感度衰减（超过24小时没互动，每次-1）
-    if profile["last_active"] > 0:
-        hours_since = (time.time() - profile["last_active"]) / 3600
-        if hours_since > 24:
-            decay = min(int(hours_since / 24), 5)  # 最多-5
-            profile["affinity"] = max(0, profile["affinity"] - decay)
+        # 长时间不互动好感度衰减（超过24小时没互动，每次-1）
+        if profile["last_active"] > 0:
+            hours_since = (time.time() - profile["last_active"]) / 3600
+            if hours_since > 24:
+                decay = min(int(hours_since / 24), 5)
+                profile["affinity"] = max(0, profile["affinity"] - decay)
 
     # 长期记忆：提取关键信息
     if "memories" not in profile:
@@ -250,8 +254,10 @@ def _get_user_context(user_id: str) -> str:
         parts.append(f"这个用户经常聊: {', '.join(profile['topics'][-5:])}")
     if profile.get("mentioned_count", 0) > 10:
         parts.append("这个用户经常和你聊天，算是老熟人了")
-    affinity = profile.get("affinity", 50)
-    if affinity >= 80:
+    affinity = profile.get("affinity", 0)
+    if affinity >= 100:
+        parts.append(f"好感度: {affinity}/100 (这是你的主人，最亲密的人，可以撒娇、任性)")
+    elif affinity >= 80:
         parts.append(f"好感度: {affinity}/100 (非常亲密，可以撒娇、开玩笑)")
     elif affinity >= 60:
         parts.append(f"好感度: {affinity}/100 (关系不错，可以轻松聊天)")
@@ -577,7 +583,7 @@ async def handle_chat(event: MessageEvent):
         _update_user_profile(user_id, message)
 
         # 限制历史记录长度（根据好感度和身份动态调整）
-        affinity = _user_profiles.get(user_id, {}).get("affinity", 50)
+        affinity = _user_profiles.get(user_id, {}).get("affinity", 0)
         if user_id == _get_owner_qq():
             max_history = 31  # 主人15轮
         elif affinity >= 80:
