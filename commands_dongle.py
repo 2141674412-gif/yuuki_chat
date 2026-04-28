@@ -124,4 +124,4 @@ async def _cmd_dongle(event: MessageEvent):
     await _send(event, "\n".join(lines))
 
 
-dongle_cmd = _register("查机台", _cmd_dongle)
+dongle_cmd = _register("查机台", _cmd_dongle, admin_only=True)

@@ -707,6 +707,8 @@ async def handle_chatter(event: GroupMessageEvent):
 _qrcode = on_message(priority=5, block=False)
 
 _qr_detector = QReader()
+_qr_handled_msgs = set()  # 已被二维码handler处理的message_id
+_QR_SEEN_MAX = 500
 
 @_qrcode.handle()
 async def handle_qrcode(event: MessageEvent):
@@ -747,6 +749,9 @@ async def handle_qrcode(event: MessageEvent):
                     # 如果是SGWCMAID开头的二维码，回复识别结果
                     if text.startswith("SGWCMAID"):
                         logger.debug(f"[二维码] 检测到SGWCMAID: {event.message_id}")
+                        _qr_handled_msgs.add(event.message_id)
+                        if len(_qr_handled_msgs) > _QR_SEEN_MAX:
+                            _qr_handled_msgs.clear()
                         await _qrcode.send(f"识别到机台二维码：\n{text}")
                         return
                     else:
@@ -1007,6 +1012,10 @@ async def handle_image_chat(event: MessageEvent):
     # 群白名单检查
     gid = getattr(event, 'group_id', None)
     if gid and gid not in ALLOWED_GROUPS:
+        return
+
+    # 如果已被二维码handler处理（机台二维码），跳过识图
+    if event.message_id in _qr_handled_msgs:
         return
 
     # 检查消息是否包含图片
