@@ -25,26 +25,25 @@ NoneBot2 插件，基于 Ollama 本地 AI 的聊天机器人
 """
 
 import time
-import re
-import logging
 
 from nonebot import get_driver, logger
 from .config import ALLOWED_GROUPS
 
 # 过滤非白名单群的消息日志，减少终端噪音
-class _NonWhitelistFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        msg = record.getMessage()
-        # 匹配 nonebot 的消息日志格式: Message xxx from xxx@[ 群:123456]
-        if "群:" in msg and ALLOWED_GROUPS:
-            m = re.search(r'群:(\d+)', msg)
-            if m:
-                gid = int(m.group(1))
-                if gid not in ALLOWED_GROUPS:
-                    return False  # 过滤掉这条日志
-        return True
+def _filter_non_whitelist(record):
+    msg = record["message"]
+    if "群:" in msg and ALLOWED_GROUPS:
+        import re as _re
+        m = _re.search(r'群:(\d+)', msg)
+        if m:
+            gid = int(m.group(1))
+            if gid not in ALLOWED_GROUPS:
+                return False
+    return True
 
-logger.add(_NonWhitelistFilter())
+import sys as _sys
+logger.remove(_sys.stderr)
+logger.add(_sys.stderr, filter=_filter_non_whitelist)
 from . import chat
 from . import commands_base
 from . import commands_fun
