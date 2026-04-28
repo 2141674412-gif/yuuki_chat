@@ -292,7 +292,7 @@ def _apply_update(file_list, tmp_dir):
             logger.warning(f"[更新] 复制失败 {name}: {e}")
 
     # 清理旧文件
-    for old in ["commands.py", "commands_bilibili.py"]:
+    for old in ["commands.py", "commands_bilibili.py", "onebot_client.py"]:
         old_path = os.path.join(plugin_dir, old)
         if os.path.exists(old_path):
             os.remove(old_path)
