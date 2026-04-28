@@ -363,7 +363,7 @@ async def example():
     """
     client = OneBotClient(
         ws_url="ws://127.0.0.1:8888/onebot/v11/ws",
-        access_token="",  # 如果NapCat配置了token，填在这里
+        access_token="c196c4395ca8",  # NapCat access_token
         reconnect_interval=5.0,
         heartbeat_interval=30.0,
     )
