@@ -2021,7 +2021,7 @@ async def on_bot_startup():
                     messages=[{"role": "user", "content": "hi"}],
                     max_tokens=5,
                 )
-                logger.info("[预热] Ollama模型预热完成")
+                logger.info("[预热] AI模型预热完成")
             except Exception as e:
                 logger.warning(f"[预热] 模型预热失败(不影响正常使用): {e}")
         _th.Thread(target=_warmup, daemon=True).start()
