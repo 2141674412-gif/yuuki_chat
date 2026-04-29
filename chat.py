@@ -167,7 +167,11 @@ async def _rate_limited_send(matcher, message: str):
     """带速率限制的消息发送"""
     # 防踢延迟（仅防踢开启时）
     if _anti_kick_enabled:
-        delay = random.uniform(1.0, 3.0)
+        base_delay = random.uniform(1.0, 2.0)
+        # 消息越长，延迟越长（模拟阅读时间）
+        msg_len = len(str(message))
+        extra_delay = min(msg_len * 0.01, 2.0)
+        delay = base_delay + extra_delay
         await asyncio.sleep(delay)
     # 速率限制（始终生效，防止被平台风控）
     now = time.time()
@@ -1914,9 +1918,17 @@ async def _auto_chat_loop():
                 await asyncio.sleep(3600)
                 continue
 
-            # 随机等待 30~60 分钟
-            interval = random.randint(AUTO_CHAT_MIN_INTERVAL, AUTO_CHAT_MAX_INTERVAL)
-            await asyncio.sleep(interval)
+            # 非均匀分布：大部分时间间隔较长，偶尔短一些
+            r = random.random()
+            if r < 0.1:
+                wait = random.randint(15*60, 25*60)  # 10%概率：15-25分钟
+            elif r < 0.4:
+                wait = random.randint(30*60, 50*60)  # 30%概率：30-50分钟
+            elif r < 0.7:
+                wait = random.randint(50*60, 75*60)  # 30%概率：50-75分钟
+            else:
+                wait = random.randint(75*60, 120*60)  # 30%概率：75-120分钟
+            await asyncio.sleep(wait)
 
             if not _auto_chat_groups:
                 continue
@@ -1935,10 +1947,10 @@ async def _auto_chat_loop():
             elif now - _group_join_time[group_id] < _NEW_GROUP_COOLDOWN:
                 continue  # 新群2小时内不主动发言
 
-            # 检查群最近是否有活动（5分钟内有消息则不主动发言）
+            # 检查群最近是否有活动（15分钟内有消息则不主动发言）
             recent_msgs = _group_chat_log.get(group_id, [])
             now = time.time()
-            if recent_msgs and now - recent_msgs[-1][0] < 300:  # 5分钟
+            if recent_msgs and now - recent_msgs[-1][0] < 900:  # 15分钟
                 logger.debug(f"[自动发言] 群{group_id}最近有活动，跳过")
                 continue
 
