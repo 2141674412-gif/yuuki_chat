@@ -53,7 +53,7 @@ def _search(data_list, keyword):
     keyword_lower = keyword.lower()
     results = []
     for item in data_list:
-        if keyword_lower in item["shop"].lower() or keyword_lower in item["province"].lower():
+        if keyword_lower in item.get("shop", "").lower() or keyword_lower in item.get("province", "").lower():
             results.append(item)
     return results
 

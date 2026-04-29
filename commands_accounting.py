@@ -109,8 +109,10 @@ def _detect_category(text: str) -> str:
 
 def _detect_type(text: str) -> str:
     """检测是收入还是支出"""
-    income_keywords = ["收入", "收到", "工资", "奖金", "红包", "报销", "赚", "到账", "+"]
-    for kw in income_keywords:
+    income_keywords = ["收入", "收到", "工资", "奖金", "红包", "报销", "赚", "到账"]
+    # "+" 只在文本开头或独立出现时才判定为收入
+    if text.lstrip().startswith("+"):
+        return "income"
         if kw in text:
             return "income"
     return "expense"
