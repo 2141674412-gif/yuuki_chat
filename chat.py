@@ -2009,7 +2009,24 @@ driver = get_driver()
 
 @driver.on_startup
 async def on_bot_startup():
-    """bot 启动后启动自动发言任务 + 注册定时清理 + 连接健康检查"""
+    """bot 启动后预热模型 + 启动自动发言任务 + 注册定时清理 + 连接健康检查"""
+    # 预热Ollama模型（避免首次请求冷启动慢）
+    try:
+        import threading as _th
+        def _warmup():
+            try:
+                c = _create_client()
+                c.chat.completions.create(
+                    model=_cfg("model_name", "qwen2.5:7b-instruct"),
+                    messages=[{"role": "user", "content": "hi"}],
+                    max_tokens=5,
+                )
+                logger.info("[预热] Ollama模型预热完成")
+            except Exception as e:
+                logger.warning(f"[预热] 模型预热失败(不影响正常使用): {e}")
+        _th.Thread(target=_warmup, daemon=True).start()
+    except Exception:
+        pass
     start_auto_chat()
     try:
         from .commands_schedule import _get_scheduler
