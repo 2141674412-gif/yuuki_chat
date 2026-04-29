@@ -113,6 +113,7 @@ def _detect_type(text: str) -> str:
     # "+" 只在文本开头或独立出现时才判定为收入
     if text.lstrip().startswith("+"):
         return "income"
+    for kw in income_keywords:
         if kw in text:
             return "income"
     return "expense"
@@ -335,6 +336,19 @@ async def _cmd_stats(event: MessageEvent):
     await _send(event, "\n".join(lines))
 
 
+async def _cmd_delete_record(event: MessageEvent):
+    """删除最近一条记录：/删记录"""
+    uid = str(event.user_id)
+    records = _accounting.get(uid, [])
+    if not records:
+        await _send(event, "...没有记录可删。")
+        return
+    removed = records.pop()
+    _save_accounting(_accounting)
+    sign = "+" if removed.get("type") == "income" else "-"
+    await _send(event, f"...已删除：{removed.get('category', '未分类')} {removed.get('note', '')} {sign}{removed.get('amount', 0)}")
+
+
 async def _cmd_clear_records(event: MessageEvent):
     """清空记账：/清空记账"""
     uid = str(event.user_id)
@@ -351,3 +365,4 @@ record_cmd = _register("记", _cmd_record, aliases=["记账", "记录"])
 bill_cmd = _register("账单", _cmd_bill, aliases=["账目", "明细"])
 stats_cmd = _register("统计", _cmd_stats, aliases=["汇总"])
 clear_cmd = _register("清空记账", _cmd_clear_records, aliases=["清除记账"])
+delete_record_cmd = _register("删记录", _cmd_delete_record, aliases=["删除记录"])

@@ -39,6 +39,19 @@ def _mask_qq(qq: str) -> str:
 
 # -- 签到 --
 
+# -- 签到里程碑 --
+MILESTONES = {
+    3: ("三日坚持 🌱", 30),
+    7: ("一周达人 ⭐", 50),
+    14: ("两周毅力 💪", 100),
+    21: ("三周之星 🌟", 150),
+    30: ("月签传说 👑", 300),
+    60: ("双月勇士 🏆", 500),
+    100: ("百日不辍 💎", 1000),
+    365: ("一年之约 🎊", 5000),
+}
+
+
 async def _cmd_checkin(event: MessageEvent):
     user_id = str(event.user_id)
     today = datetime.now().strftime("%Y-%m-%d")
@@ -75,6 +88,14 @@ async def _cmd_checkin(event: MessageEvent):
         total = 10
         bonus_desc = ""
     user_points[user_id] += total
+
+    # 检查里程碑奖励
+    milestone_msg = ""
+    if streak in MILESTONES:
+        milestone_name, milestone_bonus = MILESTONES[streak]
+        user_points[user_id] += milestone_bonus
+        milestone_msg = f"\n达成里程碑：{milestone_name}！额外 +{milestone_bonus} 积分"
+
     _save_checkin_records()
     _save_points()
 
@@ -92,9 +113,9 @@ async def _cmd_checkin(event: MessageEvent):
     elif streak >= 7:
         streak_msg += " 还挺坚持的嘛。"
 
-    await _send(event, 
+    await _send(event,
         f"签到成功。+{total}积分{bonus_desc}\n"
-        f"当前积分：{user_points[user_id]}\n"
+        f"当前积分：{user_points[user_id]}{milestone_msg}\n"
         f"今日运势：{luck} - {luck_msg[luck]}{streak_msg}"
     )
 
