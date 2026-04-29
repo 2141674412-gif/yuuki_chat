@@ -162,6 +162,10 @@ _RATE_LIMIT_60S = 20  # 60秒内最多20条
 
 async def _rate_limited_send(matcher, message: str):
     """带速率限制的消息发送"""
+    # 模拟人类打字延迟
+    import random as _random
+    delay = _random.uniform(1.0, 3.0)
+    await asyncio.sleep(delay)
     now = time.time()
     # 清理过期记录
     _send_times[:] = [t for t in _send_times if now - t < 60]
@@ -529,7 +533,7 @@ async def handle_sleep_at(event: GroupMessageEvent):
 
     # 随机回复
     reply = random.choice(_SLEEP_REPLIES)
-    await _sleep_cmd.send(reply)
+    await _rate_limited_send(_sleep_cmd, reply)
 
 
 # 消息处理（优先级 1，block=False 让命令能继续传递）
@@ -1410,7 +1414,7 @@ async def handle_image_chat(event: MessageEvent):
         if seen_key in _accounting_seen:
             logger.info(f"[截图记账] 跳过重复图片: {img_files[0]}")
             try:
-                await _img_chat.send("...这张截图已经记过了。")
+                await _rate_limited_send(_img_chat, "...这张截图已经记过了。")
             except Exception:
                 pass
             return
@@ -1448,7 +1452,7 @@ async def handle_image_chat(event: MessageEvent):
         if not images_b64:
             logger.warning(f"[图片理解] 图片处理失败，原始URL数: {len(img_urls)}")
             try:
-                await _img_chat.send("...图片处理失败了。")
+                await _rate_limited_send(_img_chat, "...图片处理失败了。")
             except Exception:
                 pass
             return
@@ -1612,9 +1616,9 @@ type规则：支出→"expense"，收入→"income"
                                             if saved_count == 1:
                                                 r = records[0] if records else {}
                                                 sign = "+" if r.get("type") == "income" else "-"
-                                                await _img_chat.send(f"已记录：{r.get('category','其他')} {r.get('note','')} {sign}{float(r.get('amount',0)):.0f}")
+                                                await _rate_limited_send(_img_chat, f"已记录：{r.get('category','其他')} {r.get('note','')} {sign}{float(r.get('amount',0)):.0f}")
                                             else:
-                                                await _img_chat.send(f"已记录 {saved_count} 笔交易。")
+                                                await _rate_limited_send(_img_chat, f"已记录 {saved_count} 笔交易。")
                                             return
                                 except (json.JSONDecodeError, ValueError):
                                     pass
@@ -1700,14 +1704,14 @@ type规则：支出→"expense"，收入→"income"
             if len(chat_history[user_id]) > 21:
                 chat_history[user_id] = [chat_history[user_id][0]] + chat_history[user_id][-20:]
             _history_timestamps[user_id] = time.time()
-            await _img_chat.send(reply)
+            await _rate_limited_send(_img_chat, reply)
     except FinishedException:
         raise
     except Exception as e:
         # 模型不支持视觉或请求失败
         logger.warning(f"[图片理解] 失败: {type(e).__name__}: {str(e)[:100]}")
         try:
-            await _img_chat.send("...图片理解功能暂时不可用，稍后再试试。")
+            await _rate_limited_send(_img_chat, "...图片理解功能暂时不可用，稍后再试试。")
         except Exception:
             pass
 
@@ -1739,6 +1743,9 @@ def _load_auto_chat_config():
 async def _auto_chat_loop():
     """定时主动发言的异步循环"""
     global _auto_chat_task
+    _daily_auto_count = 0
+    _daily_auto_date = ""
+    _DAILY_AUTO_LIMIT = 20
     await asyncio.sleep(60)  # 启动后等1分钟再开始
 
     # 重启冷却：检查上次发言时间，如果距离不到30分钟则等待
@@ -1795,6 +1802,15 @@ async def _auto_chat_loop():
 
     while True:
         try:
+            # 每日主动发言上限
+            today = time.strftime("%Y-%m-%d")
+            if _daily_auto_date != today:
+                _daily_auto_date = today
+                _daily_auto_count = 0
+            if _daily_auto_count >= _DAILY_AUTO_LIMIT:
+                await asyncio.sleep(3600)
+                continue
+
             # 随机等待 30~60 分钟
             interval = random.randint(AUTO_CHAT_MIN_INTERVAL, AUTO_CHAT_MAX_INTERVAL)
             await asyncio.sleep(interval)
@@ -1852,6 +1868,7 @@ async def _auto_chat_loop():
                     message=reply
                 )
                 logger.info(f"[自动发言] 群{group_id}: {reply}")
+                _daily_auto_count += 1
                 # 记录本次发言时间
                 try:
                     with open(_AUTO_CHAT_TIME_FILE, "w") as f:
