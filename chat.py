@@ -187,6 +187,10 @@ async def _rate_limited_send(matcher, message: str):
 _last_chatter_time: dict[int, float] = {}  # {group_id: timestamp}
 _CHATTER_COOLDOWN = 60  # 同一群60秒内最多插话一次
 
+# ========== 新群冷却 ==========
+_group_join_time: dict[int, float] = {}  # {group_id: join_timestamp}
+_NEW_GROUP_COOLDOWN = 2 * 3600  # 新群2小时冷却期
+
 # ========== 错误静默 ==========
 _consecutive_errors = 0
 _error_silence_until = 0.0
@@ -975,6 +979,13 @@ async def handle_chatter(event: GroupMessageEvent):
     # 群白名单检查
     if event.group_id not in ALLOWED_GROUPS:
         return
+
+    # 新群冷却检查
+    now = time.time()
+    if event.group_id not in _group_join_time:
+        _group_join_time[event.group_id] = now
+    elif now - _group_join_time[event.group_id] < _NEW_GROUP_COOLDOWN:
+        return  # 新群2小时内不插话
 
     # 插话冷却检查
     now = time.time()
@@ -1791,6 +1802,22 @@ async def _auto_chat_loop():
         "今天天气怎么样呢",
         "早餐吃了什么",
         "早上好困啊",
+        "今天天气好热啊…不想出门",
+        "好想吃包子…早餐好难选",
+        "闹钟响了三次才起来…好累",
+        "今天要做什么呢…好迷茫",
+        "路上看到一只小猫，好可爱",
+        "早安~大家今天也要加油哦",
+        "突然想到昨天做了一个奇怪的梦",
+        "在听歌~早上听歌心情好",
+        "今天穿什么好呢…纠结",
+        "早起的鸟儿有虫吃…但我不是鸟",
+        "刚刷到一条新闻好震惊",
+        "有没有人跟我一样赖床到最后一秒",
+        "今天星期几来着…完全忘了",
+        "好想喝一杯冰美式清醒一下",
+        "早上坐地铁好挤啊…差点没上去",
+        "新的一天新的摸鱼计划",
     ]
     proactive_hints_afternoon = [
         "群里好安静",
@@ -1798,6 +1825,21 @@ async def _auto_chat_loop():
         "有点无聊想找人聊天",
         "在看窗外的风景",
         "在想接下来做什么",
+        "好想吃冰淇淋…夏天好热",
+        "有人在吗…好无聊啊",
+        "想打游戏了…有没有人陪玩",
+        "推荐首歌给我呗~最近歌荒",
+        "下午好困…想喝奶茶续命",
+        "话说你们午饭吃了什么",
+        "突然想到一个好笑的事情",
+        "下午摸鱼中…有没有人一起",
+        "刚看到一个超有意思的视频",
+        "今天工作/学习好累…想躺平",
+        "有没有好看的动漫推荐",
+        "好想出去散步…但是好懒",
+        "你们有没有什么好玩的app推荐",
+        "下午好~大家都在忙什么",
+        "突然好想吃烧烤…有没有人约",
     ]
     proactive_hints_evening = [
         "今天过得怎么样",
@@ -1805,12 +1847,43 @@ async def _auto_chat_loop():
         "肚子饿了想吃东西",
         "在看什么好玩的",
         "突然想到了什么",
+        "好想吃火锅…有人一起吗",
+        "心情不太好…想找人聊聊",
+        "在追什么番啊…推荐一下",
+        "今天好累…终于下班了",
+        "晚饭吃什么呢…选择困难症",
+        "猫猫好可爱…刚才刷到好多猫图",
+        "有没有人陪我打游戏~",
+        "晚上好适合看一部电影",
+        "刚吃完饭…好撑啊",
+        "今天有没有发生什么有趣的事",
+        "好想学个新技能…但不知道学什么",
+        "你们平时晚上都干嘛",
+        "突然发现一首超好听的歌",
+        "有没有人最近在追什么剧",
+        "好想出去走走…散散心",
     ]
     proactive_hints_night = [
         "还不睡觉吗",
         "夜深了呢",
         "明天有什么计划",
         "好安静啊",
+        "有点困了…但是不想睡",
+        "在听歌~晚上听歌好舒服",
+        "突然想到一个问题…",
+        "话说你们一般几点睡",
+        "夜宵吃什么好呢…好纠结",
+        "今天有没有什么开心的事",
+        "好无聊…有没有人在线",
+        "晚安~明天见哦",
+        "凌晨了…还在刷手机",
+        "突然饿了…想吃泡面",
+        "今晚的月亮好亮啊",
+        "有没有人跟我一样熬夜冠军",
+        "好想找人连麦聊天",
+        "在发呆…不知道在想什么",
+        "深夜emo时间…算了不想了",
+        "明天要早起…但我还不想睡",
     ]
 
     def _get_proactive_hints():
@@ -1848,6 +1921,13 @@ async def _auto_chat_loop():
             # 只向白名单群发言
             if int(group_id) not in ALLOWED_GROUPS:
                 continue
+
+            # 新群冷却检查
+            now = time.time()
+            if group_id not in _group_join_time:
+                _group_join_time[group_id] = now
+            elif now - _group_join_time[group_id] < _NEW_GROUP_COOLDOWN:
+                continue  # 新群2小时内不主动发言
 
             # 检查群最近是否有活动（5分钟内有消息则不主动发言）
             recent_msgs = _group_chat_log.get(group_id, [])
