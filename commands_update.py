@@ -332,7 +332,7 @@ def _do_restart(user_id, event):
             sentry_sdk.flush()
         except Exception:
             pass
-        sys.exit(0)
+        os._exit(0)
     except Exception as e:
         return str(e)
     return None
