@@ -1029,7 +1029,7 @@ async def handle_chatter(event: GroupMessageEvent):
         return
 
     # 深夜降频：0-6点插话概率降低
-    hour = time.localtime().hour
+    hour = datetime.now().hour
     if 0 <= hour < 6 and random.random() > 0.2:
         return
 
@@ -1928,7 +1928,7 @@ async def _auto_chat_loop():
     ]
 
     def _get_proactive_hints():
-        hour = time.localtime().hour
+        hour = datetime.now().hour
         if 6 <= hour < 12:
             return proactive_hints_morning
         elif 12 <= hour < 18:
@@ -1962,7 +1962,7 @@ async def _auto_chat_loop():
             await asyncio.sleep(wait)
 
             # 深夜降频：0-6点大幅降低主动发言概率
-            hour = time.localtime().hour
+            hour = datetime.now().hour
             if 0 <= hour < 6:
                 if random.random() > 0.15:  # 85% 概率跳过
                     logger.debug(f"[自动发言] 深夜{hour}点，跳过本次发言")
