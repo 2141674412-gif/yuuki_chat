@@ -24,7 +24,7 @@ def _get_superusers() -> set:
         return set()
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent, MessageSegment
 from nonebot.exception import FinishedException
-from openai import APIError, APITimeoutError, OpenAI
+from openai import APIError, APITimeoutError, BadRequestError, OpenAI
 from PIL import Image
 from qreader import QReader
 
@@ -708,6 +708,9 @@ async def handle_chat(event: MessageEvent):
                 loop.run_in_executor(None, _collect_stream),
                 timeout=90.0
             )
+        except BadRequestError:
+            # 请求格式错误，不重试，直接抛出
+            raise
         except (APITimeoutError, APIError, Exception) as first_err:
             # 第一次失败，自动重试一次
             logger.info(f"[聊天] API调用失败，自动重试: {type(first_err).__name__}")
