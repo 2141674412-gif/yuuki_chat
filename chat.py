@@ -13,7 +13,8 @@ from io import BytesIO
 
 # 第三方库
 import numpy as np
-from nonebot import get_bot, get_driver, logger, on_message
+from nonebot import get_bot, get_driver, logger, on_command, on_message
+from nonebot.plugin import Matcher
 
 # 获取superusers（延迟获取，等driver初始化后）
 def _get_superusers() -> set:
@@ -165,22 +166,19 @@ _RATE_LIMIT_60S = 20  # 60秒内最多20条
 
 async def _rate_limited_send(matcher, message: str):
     """带速率限制的消息发送"""
+    # 防踢延迟（仅防踢开启时）
     if _anti_kick_enabled:
-        # 模拟人类打字延迟
-        import random as _random
-        delay = _random.uniform(1.0, 3.0)
+        delay = random.uniform(1.0, 3.0)
         await asyncio.sleep(delay)
+    # 速率限制（始终生效，防止被平台风控）
     now = time.time()
-    if _anti_kick_enabled:
-        # 清理过期记录
-        _send_times[:] = [t for t in _send_times if now - t < 60]
-        # 检查限制
-        recent_5s = sum(1 for t in _send_times if now - t < 5)
-        if recent_5s >= _RATE_LIMIT_5S:
-            await asyncio.sleep(2)  # 等待2秒
-        if len(_send_times) >= _RATE_LIMIT_60S:
-            await asyncio.sleep(5)  # 等待5秒
-        _send_times.append(time.time())
+    _send_times[:] = [t for t in _send_times if now - t < 60]
+    recent_5s = sum(1 for t in _send_times if now - t < 5)
+    if recent_5s >= _RATE_LIMIT_5S:
+        await asyncio.sleep(2)  # 等待2秒
+    if len(_send_times) >= _RATE_LIMIT_60S:
+        await asyncio.sleep(5)  # 等待5秒
+    _send_times.append(time.time())
     try:
         await matcher.send(message)
     except Exception:
@@ -567,6 +565,7 @@ chat = on_message(priority=1, block=False)
 
 @chat.handle()
 async def handle_chat(event: MessageEvent):
+    global _consecutive_errors, _error_silence_until
     user_id = str(event.user_id)
     message = str(event.message)
 
