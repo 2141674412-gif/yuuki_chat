@@ -13,6 +13,19 @@ import datetime
 import tempfile
 from PIL import Image, ImageDraw
 
+# ---- 舞萌模块速率限制 ----
+import time as _maimai_time
+_maimai_last_send = 0.0
+
+async def _mai_rate_send(matcher, message):
+    """舞萌模块速率限制发送"""
+    global _maimai_last_send
+    now = _maimai_time.time()
+    if now - _maimai_last_send < 1.0:
+        await asyncio.sleep(1.0)
+    _maimai_last_send = _maimai_time.time()
+    await matcher.send(message)
+
 # ---- 成就徽章图片加载 ----
 _PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 _BADGE_SEARCH_PATHS = [
@@ -906,7 +919,7 @@ async def handle_mai(event: MessageEvent):
     if content.startswith("歌曲") or content.lower().startswith("song"):
         song_name = content[2:].strip() if content.startswith("歌曲") else content[4:].strip()
         if not song_name:
-            await mai_cmd.send("...歌名呢。格式：/mai 歌曲 歌名")
+            await _mai_rate_send(mai_cmd, "...歌名呢。格式：/mai 歌曲 歌名")
             return
         try:
             # 并行获取歌曲数据和用户绑定信息
@@ -949,7 +962,7 @@ async def handle_mai(event: MessageEvent):
             player_data = results[1] if not isinstance(results[1], Exception) else None
 
             if not music_data:
-                await mai_cmd.send("...获取歌曲数据失败了。稍后再试。")
+                await _mai_rate_send(mai_cmd, "...获取歌曲数据失败了。稍后再试。")
                 return
 
             # 搜索匹配的歌曲
@@ -966,7 +979,7 @@ async def handle_mai(event: MessageEvent):
                         break
 
             if not matched:
-                await mai_cmd.send(f"找不到叫「{song_name}」的歌。检查一下歌名？")
+                await _mai_rate_send(mai_cmd, f"找不到叫「{song_name}」的歌。检查一下歌名？")
                 return
 
             # 从已获取的玩家数据中查找对应歌曲成绩
@@ -983,35 +996,35 @@ async def handle_mai(event: MessageEvent):
             buf = io.BytesIO()
             song_img.save(buf, format="PNG")
             buf.seek(0)
-            await mai_cmd.send(MessageSegment.image(buf))
+            await _mai_rate_send(mai_cmd, MessageSegment.image(buf))
 
         except FinishedException:
             raise
         except httpx.TimeoutException:
-            await mai_cmd.send("...水鱼API超时了，网络可能不太稳定，稍后再试吧。")
+            await _mai_rate_send(mai_cmd, "...水鱼API超时了，网络可能不太稳定，稍后再试吧。")
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
             if status == 429:
-                await mai_cmd.send("...请求太频繁了，水鱼限制了访问。等一会儿再试。")
+                await _mai_rate_send(mai_cmd, "...请求太频繁了，水鱼限制了访问。等一会儿再试。")
             elif status >= 500:
-                await mai_cmd.send(f"...水鱼服务器好像挂了（HTTP {status}）。过会儿再试。")
+                await _mai_rate_send(mai_cmd, f"...水鱼服务器好像挂了（HTTP {status}）。过会儿再试。")
             else:
-                await mai_cmd.send(f"...请求出错了（HTTP {status}）。稍后再试。")
+                await _mai_rate_send(mai_cmd, f"...请求出错了（HTTP {status}）。稍后再试。")
         except httpx.ConnectError:
-            await mai_cmd.send("...连不上水鱼服务器。检查一下网络？")
+            await _mai_rate_send(mai_cmd, "...连不上水鱼服务器。检查一下网络？")
         except Exception as e:
             logger.error(f"[单曲查询] 出错: {e}")
-            await mai_cmd.send("查询出错了，稍后再试吧。")
+            await _mai_rate_send(mai_cmd, "查询出错了，稍后再试吧。")
         return
 
     # /mai 绑定 用户名 → 改为提示用新命令
     if content.startswith("绑定"):
-        await mai_cmd.send("...绑定命令已更新：\n/绑定 好友码 — 绑定好友码（查牌子用）\n/绑定水鱼 用户名 — 绑定水鱼账号（查B50用）")
+        await _mai_rate_send(mai_cmd, "...绑定命令已更新：\n/绑定 好友码 — 绑定好友码（查牌子用）\n/绑定水鱼 用户名 — 绑定水鱼账号（查B50用）")
         return
 
     # /mai 解绑 → 提示用新命令
     if content == "解绑":
-        await mai_cmd.send("...请直接发 /解绑")
+        await _mai_rate_send(mai_cmd, "...请直接发 /解绑")
         return
 
     # /mai b50 用户名 或 /mai b40 用户名
@@ -1048,7 +1061,7 @@ async def handle_mai(event: MessageEvent):
             body_key = "username"
             username = df_username
         else:
-            await mai_cmd.send("...还没绑定。格式：/mai b50 用户名\n或 /绑定水鱼 用户名 /绑定token token")
+            await _mai_rate_send(mai_cmd, "...还没绑定。格式：/mai b50 用户名\n或 /绑定水鱼 用户名 /绑定token token")
             return
     else:
         body_key = "username"
@@ -1118,18 +1131,18 @@ async def handle_mai(event: MessageEvent):
 
         if "error" in data and "charts" not in data:
             err_msg = data.get("error", data.get("message", "未知错误"))
-            await mai_cmd.send(f"查不到这个人。{err_msg}")
+            await _mai_rate_send(mai_cmd, f"查不到这个人。{err_msg}")
             return
 
         # 生成图片（异步，因为要下载封面）
         if _cache_hit:
-            await mai_cmd.send("正在生成图片，请稍等...（数据可能有5分钟延迟）")
+            await _mai_rate_send(mai_cmd, "正在生成图片，请稍等...（数据可能有5分钟延迟）")
         else:
-            await mai_cmd.send("正在生成图片，请稍等...")
+            await _mai_rate_send(mai_cmd, "正在生成图片，请稍等...")
         img = await generate_mai_image(data, is_b50)
 
         if img is None:
-            await mai_cmd.send("没有成绩数据。")
+            await _mai_rate_send(mai_cmd, "没有成绩数据。")
             return
 
         # 保存到内存并发送
@@ -1137,25 +1150,25 @@ async def handle_mai(event: MessageEvent):
         img.save(buf, format="PNG")
         buf.seek(0)
 
-        await mai_cmd.send(MessageSegment.image(buf))
+        await _mai_rate_send(mai_cmd, MessageSegment.image(buf))
 
     except httpx.TimeoutException:
-        await mai_cmd.send("...水鱼API超时了，网络可能不太稳定，稍后再试吧。")
+        await _mai_rate_send(mai_cmd, "...水鱼API超时了，网络可能不太稳定，稍后再试吧。")
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
         if status == 429:
-            await mai_cmd.send("...请求太频繁了，水鱼限制了访问。等一会儿再试。")
+            await _mai_rate_send(mai_cmd, "...请求太频繁了，水鱼限制了访问。等一会儿再试。")
         elif status >= 500:
-            await mai_cmd.send(f"...水鱼服务器好像挂了（HTTP {status}）。过会儿再试。")
+            await _mai_rate_send(mai_cmd, f"...水鱼服务器好像挂了（HTTP {status}）。过会儿再试。")
         else:
-            await mai_cmd.send(f"...请求出错了（HTTP {status}）。稍后再试。")
+            await _mai_rate_send(mai_cmd, f"...请求出错了（HTTP {status}）。稍后再试。")
     except httpx.ConnectError:
-        await mai_cmd.send("...连不上水鱼服务器。检查一下网络？")
+        await _mai_rate_send(mai_cmd, "...连不上水鱼服务器。检查一下网络？")
     except FinishedException:
         raise
     except Exception as e:
         logger.error(f"[B50查询] 出错: {e}")
-        await mai_cmd.send("查询出错了，稍后再试吧。")
+        await _mai_rate_send(mai_cmd, "查询出错了，稍后再试吧。")
 
 
 # ========== 绑定系统（好友码 + 水鱼用户名） ==========
@@ -1317,7 +1330,7 @@ async def handle_mai_plate(event: MessageEvent):
     df_username = info.get("diving_fish", "")
 
     if not df_token and not df_username:
-        await mai_plate_cmd.send("...还没绑定水鱼账号。私聊发 /绑定token 你的token 或 /绑定水鱼 用户名")
+        await _mai_rate_send(mai_plate_cmd, "...还没绑定水鱼账号。私聊发 /绑定token 你的token 或 /绑定水鱼 用户名")
         return
 
     try:
@@ -1335,7 +1348,7 @@ async def handle_mai_plate(event: MessageEvent):
                 logger.info(f"[牌子] 用户成绩缓存命中: {_plate_cache_key}")
 
         if not _plate_cache_hit:
-            await mai_plate_cmd.send("正在获取成绩数据...")
+            await _mai_rate_send(mai_plate_cmd, "正在获取成绩数据...")
             headers = {}
             if df_token:
                 headers["Import-Token"] = df_token
@@ -1356,14 +1369,14 @@ async def handle_mai_plate(event: MessageEvent):
                 )
 
             if resp.status_code == 400:
-                await mai_plate_cmd.send("...获取成绩失败。可能是Token过期或用户设置了隐私保护。\n请重新绑定Token：/绑定token 新token")
+                await _mai_rate_send(mai_plate_cmd, "...获取成绩失败。可能是Token过期或用户设置了隐私保护。\n请重新绑定Token：/绑定token 新token")
                 return
             resp.raise_for_status()
             player_data = resp.json()
 
             if "error" in player_data or "status" in player_data:
                 err = player_data.get("error", player_data.get("message", "未知错误"))
-                await mai_plate_cmd.send(f"...查询失败：{err}")
+                await _mai_rate_send(mai_plate_cmd, f"...查询失败：{err}")
                 return
 
             # 如果是 /player/records 格式，转换为 charts.dx/sd
@@ -1373,12 +1386,12 @@ async def handle_mai_plate(event: MessageEvent):
             _cache_set(_plate_cache_key, player_data)
             logger.info(f"[牌子] 用户成绩已缓存: {_plate_cache_key}")
         else:
-            await mai_plate_cmd.send("正在获取成绩数据...（数据可能有5分钟延迟）")
+            await _mai_rate_send(mai_plate_cmd, "正在获取成绩数据...（数据可能有5分钟延迟）")
 
         # 2. 获取歌曲数据（版本信息）
         music_data = await get_music_data()
         if not music_data:
-            await mai_plate_cmd.send("...获取歌曲数据失败。稍后再试。")
+            await _mai_rate_send(mai_plate_cmd, "...获取歌曲数据失败。稍后再试。")
             return
 
         # 构建歌曲版本映射
@@ -1519,18 +1532,21 @@ async def handle_mai_plate(event: MessageEvent):
         msg += f"━━━━━━━━━━━━━━\n进度：{done_plates}/{total_plates}"
         if done_plates == total_plates:
             msg += " 全制霸！"
-        await mai_plate_cmd.send(msg)
+        # 消息长度限制
+        if len(msg) > 3000:
+            msg = msg[:3000] + "\n（结果过长，已截断）"
+        await _mai_rate_send(mai_plate_cmd, msg)
 
     except httpx.TimeoutException:
-        await mai_plate_cmd.send("...水鱼API超时了，稍后再试。")
+        await _mai_rate_send(mai_plate_cmd, "...水鱼API超时了，稍后再试。")
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
         if status == 400:
-            await mai_plate_cmd.send("...获取成绩失败。Token可能过期了，请重新绑定。")
+            await _mai_rate_send(mai_plate_cmd, "...获取成绩失败。Token可能过期了，请重新绑定。")
         else:
-            await mai_plate_cmd.send(f"...请求出错（HTTP {status}）。")
+            await _mai_rate_send(mai_plate_cmd, f"...请求出错（HTTP {status}）。")
     except FinishedException:
         raise
     except Exception as e:
         logger.error(f"[牌子查询] 出错: {e}")
-        await mai_plate_cmd.send("...查询出错了，稍后再试。")
+        await _mai_rate_send(mai_plate_cmd, "...查询出错了，稍后再试。")

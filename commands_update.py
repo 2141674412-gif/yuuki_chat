@@ -392,6 +392,7 @@ async def _cmd_update(event: MessageEvent):
         return
 
     # 3. 下载
+    await asyncio.sleep(1)
     await _send(f"...发现新版本 {remote_tag}，正在下载...")
     url = _get_update_url()
     ok, result = await _download_update(client, url)
@@ -415,6 +416,7 @@ async def _cmd_update(event: MessageEvent):
                 pass
             return
 
+    await asyncio.sleep(1)
     await _send(f"...下载完成（{size_kb:.1f}KB），正在验证...")
 
     # 5. 验证zip
@@ -432,10 +434,12 @@ async def _cmd_update(event: MessageEvent):
 
     try:
         # 7. 备份
+        await asyncio.sleep(1)
         await _send("...正在备份...")
         _backup_current()
 
         # 8. 解压到临时目录（避免Windows文件锁）
+        await asyncio.sleep(1)
         await _send("...正在更新文件...")
         file_list, tmp_dir = await _extract_update(update_zip)
         extract_count = len(file_list)
@@ -459,6 +463,7 @@ async def _cmd_update(event: MessageEvent):
         # 11. 记录日志
         _append_changelog(remote_tag, f"自动更新，{extract_count} 个文件", user_id)
 
+        await asyncio.sleep(1)
         await _send(f"...更新完成！{remote_tag}，{extract_count} 个文件。正在重启...")
 
         # 12. 重启（启动时会从临时目录复制文件）
