@@ -2,6 +2,8 @@
 chcp 65001 >nul 2>&1
 title yuuki_chat QQ Bot
 
+set CRASH_COUNT=0
+
 :: ============================================================
 ::  yuuki_chat QQ Bot 启动脚本
 ::  使用前请确保已运行 deploy.bat 完成部署
@@ -32,7 +34,10 @@ if exist "%NAPCAT_DIR%\NapCat.Shell.exe" (
 
 :: 等待 NapCat 初始化
 timeout /t 10 /nobreak >nul
+
+:restart
 echo.
+echo [%date% %time%] Starting bot... (crash count: %CRASH_COUNT%) >> restart_log.txt
 echo [2/2] 正在启动 yuuki_chat Bot...
 echo.
 
@@ -41,4 +46,9 @@ call "%VENV_DIR%\Scripts\activate.bat"
 cd /d "%PROJECT_DIR%"
 python bot.py
 
-pause
+set /a CRASH_COUNT+=1
+echo [%date% %time%] Bot crashed, restarting in 5 seconds... >> restart_log.txt
+echo.
+echo [警告] Bot 进程已退出，5秒后自动重启... (崩溃次数: %CRASH_COUNT%)
+timeout /t 5 /nobreak >nul
+goto restart

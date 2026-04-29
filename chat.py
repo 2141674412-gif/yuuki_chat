@@ -2053,6 +2053,12 @@ async def on_bot_startup():
         logger.warning(f"[定时清理] 注册失败（APScheduler 可能未安装）: {e}")
 
 
+@driver.on_bot_disconnect
+async def on_bot_disconnect(bot: Bot, connection=None):
+    """WebSocket断连时记录日志"""
+    logger.warning(f"[连接] Bot {bot.self_id} WebSocket断连")
+
+
 async def _check_bot_health():
     """检查bot连接是否健康，如果不健康尝试重连"""
     try:
@@ -2077,3 +2083,11 @@ async def _check_bot_health():
                         logger.warning("[健康检查] ping发送失败，连接已断开")
         except Exception as e2:
             logger.debug(f"[健康检查] 重连尝试失败: {e2}")
+
+    # 检查AI API可达性
+    try:
+        _client = _get_client()
+        resp = _client.models.list()
+        logger.debug("[健康检查] AI API正常")
+    except Exception as e:
+        logger.warning(f"[健康检查] AI API不可用: {e}")
