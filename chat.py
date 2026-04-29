@@ -2040,11 +2040,11 @@ async def on_bot_startup():
         )
         logger.info("[定时清理] 已注册 chat_history 定时清理任务（每小时一次）")
 
-        # 每5分钟检查bot连接健康状态
+        # 每3分钟检查bot连接健康状态
         sched.add_job(
             _check_bot_health,
             "interval",
-            minutes=5,
+            minutes=3,
             id="bot_health_check",
             replace_existing=True,
         )
@@ -2060,7 +2060,7 @@ async def on_bot_disconnect(bot: Bot, connection=None):
 
 
 async def _check_bot_health():
-    """检查bot连接是否健康，如果不健康尝试重连"""
+    """检查bot连接是否健康，如果不健康则重启进程"""
     try:
         from nonebot import get_bot
         bot = get_bot()
@@ -2068,21 +2068,14 @@ async def _check_bot_health():
         await bot.call_api("get_login_info")
         logger.debug("[健康检查] bot连接正常")
     except Exception as e:
-        logger.warning(f"[健康检查] bot连接异常: {e}，尝试重连...")
+        logger.error(f"[健康检查] bot连接异常: {e}，将在10秒后重启进程...")
+        await asyncio.sleep(10)
         try:
-            # 尝试通过WebSocket发送ping来触发重连
-            from nonebot.drivers.websocket import WebSocket
-            # 获取WebSocket连接
-            ws_connections = getattr(bot, '_ws_connections', None)
-            if ws_connections:
-                for ws in list(ws_connections):
-                    try:
-                        await ws.send_str('{"type":"ping"}')
-                        logger.info("[健康检查] 已发送ping，等待响应...")
-                    except Exception:
-                        logger.warning("[健康检查] ping发送失败，连接已断开")
-        except Exception as e2:
-            logger.debug(f"[健康检查] 重连尝试失败: {e2}")
+            await bot.call_api("get_login_info")
+            logger.info("[健康检查] 重试成功，连接已恢复")
+        except Exception:
+            logger.error("[健康检查] 重试失败，执行进程重启...")
+            os._exit(1)
 
     # 检查AI API可达性
     try:
