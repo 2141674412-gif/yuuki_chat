@@ -2048,7 +2048,7 @@ async def on_bot_startup():
             id="bot_health_check",
             replace_existing=True,
         )
-        logger.info("[健康检查] 已注册连接健康检查（每5分钟）")
+        logger.info("[健康检查] 已注册连接健康检查（每3分钟）")
     except Exception as e:
         logger.warning(f"[定时清理] 注册失败（APScheduler 可能未安装）: {e}")
 
@@ -2071,6 +2071,7 @@ async def _check_bot_health():
         logger.error(f"[健康检查] bot连接异常: {e}，将在10秒后重启进程...")
         await asyncio.sleep(10)
         try:
+            bot = get_bot()
             await bot.call_api("get_login_info")
             logger.info("[健康检查] 重试成功，连接已恢复")
         except Exception:
