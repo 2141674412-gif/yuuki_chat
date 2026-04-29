@@ -500,7 +500,10 @@ async def handle_antikick(event: GroupMessageEvent, matcher):
     if user_id != _get_owner_qq():
         await matcher.send("只有主人才能操作这个~")
         return
-    arg = event.get_plaintext().strip()
+    arg = event.get_plaintext().strip().lstrip("/").strip()
+    # 去掉命令名本身，只保留参数
+    if arg.startswith("防踢"):
+        arg = arg[2:].strip()
     if arg in ("开", "开启", "on", "1"):
         _anti_kick_enabled = True
         await matcher.send("防踢优化已开启 ✅\n（速率限制+随机延迟+插话冷却+错误静默）")
