@@ -155,6 +155,9 @@ _GROUP_CHAT_LOG_TTL = 7 * 24 * 3600  # 保留最近 7 天的数据（秒）
 _user_profiles = {}  # {user_id: {"topics": [...], "mentioned_count": int, "last_active": float}}
 _PROFILE_FILE = os.path.join(DATA_DIR, "user_profiles.json")
 
+# ========== 防踢优化开关 ==========
+_anti_kick_enabled = True  # 防踢优化总开关
+
 # ========== 全局消息发送速率限制 ==========
 _send_times: list[float] = []  # 记录最近发送时间戳
 _RATE_LIMIT_5S = 3   # 5秒内最多3条
@@ -162,20 +165,22 @@ _RATE_LIMIT_60S = 20  # 60秒内最多20条
 
 async def _rate_limited_send(matcher, message: str):
     """带速率限制的消息发送"""
-    # 模拟人类打字延迟
-    import random as _random
-    delay = _random.uniform(1.0, 3.0)
-    await asyncio.sleep(delay)
+    if _anti_kick_enabled:
+        # 模拟人类打字延迟
+        import random as _random
+        delay = _random.uniform(1.0, 3.0)
+        await asyncio.sleep(delay)
     now = time.time()
-    # 清理过期记录
-    _send_times[:] = [t for t in _send_times if now - t < 60]
-    # 检查限制
-    recent_5s = sum(1 for t in _send_times if now - t < 5)
-    if recent_5s >= _RATE_LIMIT_5S:
-        await asyncio.sleep(2)  # 等待2秒
-    if len(_send_times) >= _RATE_LIMIT_60S:
-        await asyncio.sleep(5)  # 等待5秒
-    _send_times.append(time.time())
+    if _anti_kick_enabled:
+        # 清理过期记录
+        _send_times[:] = [t for t in _send_times if now - t < 60]
+        # 检查限制
+        recent_5s = sum(1 for t in _send_times if now - t < 5)
+        if recent_5s >= _RATE_LIMIT_5S:
+            await asyncio.sleep(2)  # 等待2秒
+        if len(_send_times) >= _RATE_LIMIT_60S:
+            await asyncio.sleep(5)  # 等待5秒
+        _send_times.append(time.time())
     try:
         await matcher.send(message)
     except Exception:
@@ -483,6 +488,27 @@ _SLEEP_REPLIES = [
 ]
 
 _sleep_cmd = on_message(priority=0, block=False)
+
+# 防踢开关命令
+_antikick_cmd = on_command("防踢", priority=1, block=True)
+
+@_antikick_cmd.handle()
+async def handle_antikick(event: GroupMessageEvent, matcher: Matcher):
+    global _anti_kick_enabled
+    user_id = str(event.user_id)
+    if user_id != _get_owner_qq():
+        await matcher.send("只有主人才能操作这个~")
+        return
+    arg = event.get_plaintext().strip()
+    if arg in ("开", "开启", "on", "1"):
+        _anti_kick_enabled = True
+        await matcher.send("防踢优化已开启 ✅\n（速率限制+随机延迟+插话冷却+错误静默）")
+    elif arg in ("关", "关闭", "off", "0"):
+        _anti_kick_enabled = False
+        await matcher.send("防踢优化已关闭 ❌\n（回复将无延迟，注意被风控风险）")
+    else:
+        status = "开启 ✅" if _anti_kick_enabled else "关闭 ❌"
+        await matcher.send(f"防踢优化状态: {status}\n\n用法: /防踢 开|关")
 
 # 全局群白名单拦截器（最高优先级，阻断非白名单群的所有消息处理）
 _group_gate = on_message(priority=-100, block=False)
@@ -954,7 +980,7 @@ async def handle_chatter(event: GroupMessageEvent):
 
     # 插话冷却检查
     now = time.time()
-    if event.group_id in _last_chatter_time and now - _last_chatter_time[event.group_id] < _CHATTER_COOLDOWN:
+    if _anti_kick_enabled and event.group_id in _last_chatter_time and now - _last_chatter_time[event.group_id] < _CHATTER_COOLDOWN:
         return
 
     # 跳过包含图片的消息（交给识图handler处理）
