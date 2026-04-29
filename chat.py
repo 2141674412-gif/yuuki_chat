@@ -14,7 +14,6 @@ from io import BytesIO
 # 第三方库
 import numpy as np
 from nonebot import get_bot, get_driver, logger, on_command, on_message
-from nonebot.plugin import Matcher
 
 # 获取superusers（延迟获取，等driver初始化后）
 def _get_superusers() -> set:
@@ -491,7 +490,7 @@ _sleep_cmd = on_message(priority=0, block=False)
 _antikick_cmd = on_command("防踢", priority=1, block=True)
 
 @_antikick_cmd.handle()
-async def handle_antikick(event: GroupMessageEvent, matcher: Matcher):
+async def handle_antikick(event: GroupMessageEvent, matcher):
     global _anti_kick_enabled
     user_id = str(event.user_id)
     if user_id != _get_owner_qq():
