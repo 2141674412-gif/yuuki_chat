@@ -2059,24 +2059,28 @@ async def on_bot_disconnect(bot: Bot, connection=None):
     logger.warning(f"[连接] Bot {bot.self_id} WebSocket断连")
 
 
+# ========== 健康检查连续失败计数 ==========
+_health_check_failures = 0
+_HEALTH_CHECK_MAX_FAILURES = 2  # 连续2次失败才重启
+
+
 async def _check_bot_health():
-    """检查bot连接是否健康，如果不健康则重启进程"""
+    """检查bot连接是否健康，连续失败则重启进程"""
+    global _health_check_failures
     try:
         from nonebot import get_bot
         bot = get_bot()
-        # 尝试调用API检查连接
         await bot.call_api("get_login_info")
         logger.debug("[健康检查] bot连接正常")
+        _health_check_failures = 0  # 成功则重置
     except Exception as e:
-        logger.error(f"[健康检查] bot连接异常: {e}，将在10秒后重启进程...")
-        await asyncio.sleep(10)
-        try:
-            bot = get_bot()
-            await bot.call_api("get_login_info")
-            logger.info("[健康检查] 重试成功，连接已恢复")
-        except Exception:
-            logger.error("[健康检查] 重试失败，执行进程重启...")
+        _health_check_failures += 1
+        logger.error(f"[健康检查] bot连接异常({_health_check_failures}/{_HEALTH_CHECK_MAX_FAILURES}): {e}")
+        if _health_check_failures >= _HEALTH_CHECK_MAX_FAILURES:
+            logger.error("[健康检查] 连续失败达到上限，执行进程重启...")
             os._exit(1)
+        else:
+            logger.warning("[健康检查] 等待下次检查确认...")
 
     # 检查AI API可达性
     try:
