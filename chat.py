@@ -191,6 +191,11 @@ async def _rate_limited_send(matcher, message: str):
 _last_chatter_time: dict[int, float] = {}  # {group_id: timestamp}
 _CHATTER_COOLDOWN = 60  # 同一群60秒内最多插话一次
 
+# ========== Per-group 发送频率限制 ==========
+_group_send_times: dict[int, list[float]] = {}  # {group_id: [timestamps]}
+_GROUP_RATE_LIMIT = 5   # 每个 group 10分钟内最多5条
+_GROUP_RATE_WINDOW = 600  # 10分钟窗口
+
 # ========== 新群冷却 ==========
 _group_join_time: dict[int, float] = {}  # {group_id: join_timestamp}
 _NEW_GROUP_COOLDOWN = 2 * 3600  # 新群2小时冷却期
@@ -198,6 +203,16 @@ _NEW_GROUP_COOLDOWN = 2 * 3600  # 新群2小时冷却期
 # ========== 错误静默 ==========
 _consecutive_errors = 0
 _error_silence_until = 0.0
+
+def _check_group_rate_limit(group_id: int) -> bool:
+    """检查该群是否在频率限制内，返回 True 表示可以发送"""
+    now = time.time()
+    times = _group_send_times.setdefault(group_id, [])
+    times[:] = [t for t in times if now - t < _GROUP_RATE_WINDOW]
+    if len(times) >= _GROUP_RATE_LIMIT:
+        return False
+    times.append(now)
+    return True
 
 def _load_user_profiles():
     global _user_profiles
@@ -776,6 +791,9 @@ async def handle_chat(event: MessageEvent):
                 pass
 
         _consecutive_errors = 0
+        # Per-group 速率限制
+        if _anti_kick_enabled and not _check_group_rate_limit(event.group_id):
+            return
         await _rate_limited_send(chat, ai_response)
 
     except FinishedException:
@@ -990,6 +1008,14 @@ async def handle_chatter(event: GroupMessageEvent):
     if event.group_id not in ALLOWED_GROUPS:
         return
 
+    # 跳过其他 bot 的消息
+    sender = event.sender
+    if hasattr(sender, 'role') and sender.role == 'member':
+        # 检查是否是 bot（通过 nickname 判断）
+        nick = getattr(sender, 'nickname', '') or getattr(sender, 'card', '') or ''
+        if nick and ('bot' in nick.lower() or '机器人' in nick or '助手' in nick):
+            return
+
     # 新群冷却检查
     now = time.time()
     if event.group_id not in _group_join_time:
@@ -1000,6 +1026,11 @@ async def handle_chatter(event: GroupMessageEvent):
     # 插话冷却检查
     now = time.time()
     if _anti_kick_enabled and event.group_id in _last_chatter_time and now - _last_chatter_time[event.group_id] < _CHATTER_COOLDOWN:
+        return
+
+    # 深夜降频：0-6点插话概率降低
+    hour = time.localtime().hour
+    if 0 <= hour < 6 and random.random() > 0.2:
         return
 
     # 跳过包含图片的消息（交给识图handler处理）
@@ -1930,6 +1961,13 @@ async def _auto_chat_loop():
                 wait = random.randint(75*60, 120*60)  # 30%概率：75-120分钟
             await asyncio.sleep(wait)
 
+            # 深夜降频：0-6点大幅降低主动发言概率
+            hour = time.localtime().hour
+            if 0 <= hour < 6:
+                if random.random() > 0.15:  # 85% 概率跳过
+                    logger.debug(f"[自动发言] 深夜{hour}点，跳过本次发言")
+                    continue
+
             if not _auto_chat_groups:
                 continue
 
@@ -1970,6 +2008,10 @@ async def _auto_chat_loop():
             reply = await _ai_generate_reply(hint, _PROACTIVE_SYSTEM_PROMPT)
             if not reply:
                 reply = random.choice(_FALLBACK_TOPICS)
+
+            # Per-group 速率限制
+            if not _check_group_rate_limit(group_id):
+                continue
 
             # 发送消息
             try:
