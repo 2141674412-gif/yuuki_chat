@@ -111,6 +111,7 @@ from . import commands_sticker
 from . import commands_remote
 from . import commands_diagnose
 from . import commands_dongle
+from . import commands_mqtt
 from . import maimai as mai_cmd
 
 # 启动时间（用于状态检查）
