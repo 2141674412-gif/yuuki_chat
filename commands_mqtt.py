@@ -1,4 +1,4 @@
-"""MQTT 远程设备控制命令"""
+"""MQTT 远程设备控制命令（仅管理员）"""
 import threading
 import asyncio
 from nonebot import get_bot
@@ -11,6 +11,9 @@ MQTT_KEEPALIVE = 60
 
 # ESP32控制主题（匹配你的ESP32代码）
 DEFAULT_TOPIC = "esp32/receive"
+
+# 总开关（默认关闭，需要管理员手动开启）
+_mqtt_enabled = False
 
 # MQTT客户端（懒加载）
 _mqtt_client = None
@@ -50,10 +53,27 @@ async def _mqtt_publish(topic: str, message: str) -> bool:
     except Exception:
         return False
 
+# ========== 总开关 ==========
+
+async def _cmd_mqtt_on(event: MessageEvent):
+    """开启MQTT控制"""
+    global _mqtt_enabled
+    _mqtt_enabled = True
+    await _send(event, "...MQTT控制已开启 ✅\n可用命令：/开风扇 /关风扇 /风速 /风扇状态 /mqtt")
+
+async def _cmd_mqtt_off(event: MessageEvent):
+    """关闭MQTT控制"""
+    global _mqtt_enabled
+    _mqtt_enabled = False
+    await _send(event, "...MQTT控制已关闭 🔒")
+
 # ========== 风扇控制命令 ==========
 
 async def _cmd_fan_on(event: MessageEvent):
     """开风扇"""
+    if not _mqtt_enabled:
+        await _send(event, "...MQTT控制未开启，请管理员先 /mqtt开")
+        return
     success = await _mqtt_publish(DEFAULT_TOPIC, "启动")
     if success:
         await _send(event, "...风扇已启动。")
@@ -62,6 +82,9 @@ async def _cmd_fan_on(event: MessageEvent):
 
 async def _cmd_fan_off(event: MessageEvent):
     """关风扇"""
+    if not _mqtt_enabled:
+        await _send(event, "...MQTT控制未开启，请管理员先 /mqtt开")
+        return
     success = await _mqtt_publish(DEFAULT_TOPIC, "停止")
     if success:
         await _send(event, "...风扇已停止。")
@@ -70,6 +93,9 @@ async def _cmd_fan_off(event: MessageEvent):
 
 async def _cmd_fan_speed(event: MessageEvent):
     """调速风扇：/风速 128"""
+    if not _mqtt_enabled:
+        await _send(event, "...MQTT控制未开启，请管理员先 /mqtt开")
+        return
     content = str(event.message).strip()
     for prefix in ["风速", "调速", "fanspeed"]:
         if content.startswith(prefix):
@@ -92,6 +118,9 @@ async def _cmd_fan_speed(event: MessageEvent):
 
 async def _cmd_fan_status(event: MessageEvent):
     """查询风扇状态"""
+    if not _mqtt_enabled:
+        await _send(event, "...MQTT控制未开启，请管理员先 /mqtt开")
+        return
     success = await _mqtt_publish(DEFAULT_TOPIC, "状态")
     if success:
         await _send(event, "...已查询风扇状态。")
@@ -116,6 +145,10 @@ async def _cmd_mqtt(event: MessageEvent):
                          "  /mqtt esp32/receive 状态")
         return
 
+    if not _mqtt_enabled:
+        await _send(event, "...MQTT控制未开启，请管理员先 /mqtt开")
+        return
+
     # 第一个空格分隔主题和消息
     parts = content.split(None, 1)
     if len(parts) < 2:
@@ -129,11 +162,13 @@ async def _cmd_mqtt(event: MessageEvent):
     else:
         await _send(event, "...MQTT连接失败。")
 
-# ========== 注册命令 ==========
+# ========== 注册命令（全部仅管理员） ==========
 from .commands_base import _register
 
-fan_on_cmd = _register("开风扇", _cmd_fan_on, aliases=["风扇开", "fan_on", "开电机", "电机开"])
-fan_off_cmd = _register("关风扇", _cmd_fan_off, aliases=["风扇关", "fan_off", "关电机", "电机关"])
-fan_speed_cmd = _register("风速", _cmd_fan_speed, aliases=["调速", "fanspeed"])
-fan_status_cmd = _register("风扇状态", _cmd_fan_status, aliases=["电机状态", "fan_status"])
-mqtt_cmd = _register("mqtt", _cmd_mqtt, aliases=["MQTT"])
+mqtt_on_cmd = _register("mqtt开", _cmd_mqtt_on, aliases=["MQTT开", "mqtt开启"], admin_only=True)
+mqtt_off_cmd = _register("mqtt关", _cmd_mqtt_off, aliases=["MQTT关", "mqtt关闭"], admin_only=True)
+fan_on_cmd = _register("开风扇", _cmd_fan_on, aliases=["风扇开", "fan_on", "开电机", "电机开"], admin_only=True)
+fan_off_cmd = _register("关风扇", _cmd_fan_off, aliases=["风扇关", "fan_off", "关电机", "电机关"], admin_only=True)
+fan_speed_cmd = _register("风速", _cmd_fan_speed, aliases=["调速", "fanspeed"], admin_only=True)
+fan_status_cmd = _register("风扇状态", _cmd_fan_status, aliases=["电机状态", "fan_status"], admin_only=True)
+mqtt_cmd = _register("mqtt", _cmd_mqtt, aliases=["MQTT"], admin_only=True)
