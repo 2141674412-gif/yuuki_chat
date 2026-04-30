@@ -1,8 +1,8 @@
 """MQTT 远程设备控制命令"""
 import threading
 import asyncio
-from nonebot import on_command, get_driver
-from nonebot.adapters.onebot.v11 import MessageEvent, Bot
+from nonebot import get_bot
+from nonebot.adapters.onebot.v11 import MessageEvent
 
 # MQTT配置
 MQTT_BROKER = "broker.emqx.io"
@@ -16,6 +16,14 @@ DEFAULT_TOPIC = "esp32/receive"
 _mqtt_client = None
 _mqtt_connected = False
 _mqtt_lock = threading.Lock()
+
+async def _send(event, msg):
+    """发送消息"""
+    bot = get_bot()
+    if hasattr(event, 'group_id'):
+        await bot.send_group_msg(group_id=event.group_id, message=msg)
+    else:
+        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 def _get_mqtt_client():
     """获取或创建MQTT客户端"""
@@ -122,7 +130,7 @@ async def _cmd_mqtt(event: MessageEvent):
         await _send(event, "...MQTT连接失败。")
 
 # ========== 注册命令 ==========
-from .commands_base import _register, _send
+from .commands_base import _register
 
 fan_on_cmd = _register("开风扇", _cmd_fan_on, aliases=["风扇开", "fan_on", "开电机", "电机开"])
 fan_off_cmd = _register("关风扇", _cmd_fan_off, aliases=["风扇关", "fan_off", "关电机", "电机关"])
