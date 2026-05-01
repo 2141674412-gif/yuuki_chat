@@ -11,7 +11,7 @@ from nonebot import logger, get_driver
 from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import MessageEvent
 
-from .commands_base import _register, check_superuser, _DATA_DIR
+from .commands_base import _register, check_superuser, check_owner, _DATA_DIR
 import asyncio
 
 # ─────────────────────────────────────────────────────────────
@@ -151,8 +151,8 @@ def _check_code_bugs():
 
 async def _cmd_diagnose(event: MessageEvent):
     """自检诊断：检查bot运行环境和常见问题"""
-    if not check_superuser(str(event.user_id)):
-        await _send(event, "...你不是管理员。")
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能诊断。")
         return
 
     issues = []

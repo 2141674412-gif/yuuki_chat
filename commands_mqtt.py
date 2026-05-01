@@ -57,12 +57,18 @@ async def _mqtt_publish(topic: str, message: str) -> bool:
 
 async def _cmd_mqtt_on(event: MessageEvent):
     """开启MQTT控制"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能控制。")
+        return
     global _mqtt_enabled
     _mqtt_enabled = True
     await _send(event, "...MQTT控制已开启 ✅\n可用命令：/开风扇 /关风扇 /风速 /风扇状态 /mqtt")
 
 async def _cmd_mqtt_off(event: MessageEvent):
     """关闭MQTT控制"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能控制。")
+        return
     global _mqtt_enabled
     _mqtt_enabled = False
     await _send(event, "...MQTT控制已关闭 🔒")
@@ -163,7 +169,7 @@ async def _cmd_mqtt(event: MessageEvent):
         await _send(event, "...MQTT连接失败。")
 
 # ========== 注册命令（全部仅管理员） ==========
-from .commands_base import _register
+from .commands_base import _register, check_owner
 
 mqtt_on_cmd = _register("mqtt开", _cmd_mqtt_on, aliases=["MQTT开", "mqtt开启"], admin_only=True)
 mqtt_off_cmd = _register("mqtt关", _cmd_mqtt_off, aliases=["MQTT关", "mqtt关闭"], admin_only=True)

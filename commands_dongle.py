@@ -10,7 +10,7 @@ import os
 from nonebot import logger
 from nonebot.adapters.onebot.v11 import MessageEvent
 
-from .commands_base import _register, _DATA_DIR
+from .commands_base import _register, _DATA_DIR, check_owner
 
 
 # 数据文件路径
@@ -60,6 +60,9 @@ def _search(data_list, keyword):
 
 async def _cmd_dongle(event: MessageEvent):
     """查机台命令处理器"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能查。")
+        return
     content = str(event.message).strip()
     # 去掉命令前缀
     for prefix in ["查机台"]:

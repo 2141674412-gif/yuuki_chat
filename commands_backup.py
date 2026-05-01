@@ -75,8 +75,8 @@ def _cleanup_old_backups():
 
 async def _cmd_manual_backup(event: MessageEvent):
     """手动备份：/手动备份"""
-    if not check_superuser(str(event.user_id)):
-        await _send(event, "...你不是管理员。")
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能备份。")
         return
     await _send(event, "正在备份中...")
     result = await _do_backup()

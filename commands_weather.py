@@ -397,6 +397,6 @@ async def _cmd_my_weather(event: MessageEvent):
 
 
 weather_cmd = _register("天气", _cmd_weather, aliases=["weather"])
-weather_bind_cmd = _register("绑定天气", _cmd_weather_bind, aliases=["bindweather"], admin_only=True)
-weather_unbind_cmd = _register("解绑天气", _cmd_weather_unbind, aliases=["unbindweather"], admin_only=True)
+weather_bind_cmd = _register("绑定天气", _cmd_weather_bind, aliases=["bindweather"])
+weather_unbind_cmd = _register("解绑天气", _cmd_weather_unbind, aliases=["unbindweather"])
 my_weather_cmd = _register("我的天气", _cmd_my_weather, aliases=["myweather", "setcity"])
