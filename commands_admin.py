@@ -160,14 +160,13 @@ async def _cmd_add_group(event: MessageEvent):
     if hasattr(event, 'group_id') and event.group_id:
         return
     content = str(event.message).strip()
+    # 先清理CQ码残留
+    content = re.sub(r'\[CQ:[^\]]+\]', '', content).strip()
     # 去掉命令前缀
     for prefix in ["加群", "addgroup", "add_group"]:
         if content.startswith(prefix):
             content = content[len(prefix):].strip()
             break
-    # 清理可能的CQ码残留
-    import re as _re
-    content = _re.sub(r'\[CQ:[^\]]+\]', '', content).strip()
     if not content:
         await _send(event, "...群号呢。格式：/加群 群号")
         return
@@ -197,12 +196,12 @@ async def _cmd_remove_group(event: MessageEvent):
     if hasattr(event, 'group_id') and event.group_id:
         return
     content = str(event.message).strip()
+    # 先清理CQ码残留
+    content = re.sub(r'\[CQ:[^\]]+\]', '', content).strip()
     for prefix in ["移群", "delgroup", "del_group"]:
         if content.startswith(prefix):
             content = content[len(prefix):].strip()
             break
-    # 清理可能的CQ码残留
-    content = _re.sub(r'\[CQ:[^\]]+\]', '', content).strip()
     if not content:
         await _send(event, "...群号呢。格式：/移群 群号")
         return
