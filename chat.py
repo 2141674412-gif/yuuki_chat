@@ -541,8 +541,8 @@ async def _block_non_whitelist(event: MessageEvent):
     """非白名单群的群消息直接阻断，不进入任何后续handler"""
     gid = getattr(event, 'group_id', None)
     if gid and gid not in ALLOWED_GROUPS:
-        # 非白名单群，设置block=True阻止后续handler
-        _group_gate.block = True
+        from nonebot.exception import FinishedException
+        raise FinishedException()
 
 @_sleep_cmd.handle()
 async def handle_sleep_at(event: GroupMessageEvent):
