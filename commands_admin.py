@@ -165,6 +165,9 @@ async def _cmd_add_group(event: MessageEvent):
         if content.startswith(prefix):
             content = content[len(prefix):].strip()
             break
+    # 清理可能的CQ码残留
+    import re as _re
+    content = _re.sub(r'\[CQ:[^\]]+\]', '', content).strip()
     if not content:
         await _send(event, "...群号呢。格式：/加群 群号")
         return
@@ -198,6 +201,8 @@ async def _cmd_remove_group(event: MessageEvent):
         if content.startswith(prefix):
             content = content[len(prefix):].strip()
             break
+    # 清理可能的CQ码残留
+    content = _re.sub(r'\[CQ:[^\]]+\]', '', content).strip()
     if not content:
         await _send(event, "...群号呢。格式：/移群 群号")
         return
