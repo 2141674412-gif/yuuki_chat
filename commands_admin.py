@@ -11,7 +11,7 @@ import sys
 from nonebot.adapters.onebot.v11 import MessageEvent
 
 # 从子模块导入
-from .commands_base import _register, check_superuser, _save_blacklist, user_blacklist, _DATA_DIR
+from .commands_base import _register, check_superuser, check_admin, check_owner, _save_blacklist, user_blacklist, admins, _save_admins, superusers, _DATA_DIR
 from .config import load_persona, save_persona, PERSONA_FILE
 from .chat import chat_history
 
@@ -309,3 +309,122 @@ async def _cmd_migrate_data(event: MessageEvent):
     await _send(event, f"[OK] 数据迁移完成。\n当前数据目录: {_DATA_DIR}\n文件列表: {os.listdir(_DATA_DIR)}")
 
 migrate_cmd = _register("迁移数据", _cmd_migrate_data, priority=1, admin_only=True)
+
+# ========== 管理员管理（仅主人） ==========
+
+async def _cmd_set_admin(event: MessageEvent):
+    """设置管理员：/设管理 @某人 或 /设管理 QQ号"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能设置管理员。")
+        return
+    content = str(event.message).strip()
+    for prefix in ["设管理", "设置管理员", "添加管理员"]:
+        if content.startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+    if not content:
+        await _send(event, "...格式：/设管理 @某人 或 /设管理 QQ号")
+        return
+    # Extract QQ number from @mention or plain number
+    m = re.search(r'\[CQ:at,qq=(\d+)\]', content) or re.search(r'(\d{5,12})', content)
+    if not m:
+        await _send(event, "...无法识别QQ号。")
+        return
+    target = m.group(1)
+    if target in superusers:
+        await _send(event, "...这是主人，不需要设置。")
+        return
+    if target in admins:
+        await _send(event, "...已经是管理员了。")
+        return
+    admins.append(target)
+    _save_admins()
+    await _send(event, f"...已设置 {target} 为管理员。")
+
+async def _cmd_remove_admin(event: MessageEvent):
+    """撤销管理员：/撤管理 @某人 或 /撤管理 QQ号"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能撤销管理员。")
+        return
+    content = str(event.message).strip()
+    for prefix in ["撤管理", "撤销管理员", "删除管理员"]:
+        if content.startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+    if not content:
+        await _send(event, "...格式：/撤管理 @某人 或 /撤管理 QQ号")
+        return
+    m = re.search(r'\[CQ:at,qq=(\d+)\]', content) or re.search(r'(\d{5,12})', content)
+    if not m:
+        await _send(event, "...无法识别QQ号。")
+        return
+    target = m.group(1)
+    if target in superusers:
+        await _send(event, "...无法撤销主人的权限。")
+        return
+    if target not in admins:
+        await _send(event, "...该用户不是管理员。")
+        return
+    admins.remove(target)
+    _save_admins()
+    await _send(event, f"...已撤销 {target} 的管理员权限。")
+
+set_admin_cmd = _register("设管理", _cmd_set_admin, aliases=["设置管理员", "添加管理员"], admin_only=True)
+remove_admin_cmd = _register("撤管理", _cmd_remove_admin, aliases=["撤销管理员", "删除管理员"], admin_only=True)
+
+# ========== 私聊白名单管理 ==========
+
+async def _cmd_add_private(event: MessageEvent):
+    """添加私聊白名单：/加私聊 @某人 或 /加私聊 QQ号"""
+    if not check_admin(str(event.user_id)):
+        await _send(event, "...你不是管理员。")
+        return
+    content = str(event.message).strip()
+    for prefix in ["加私聊", "添加私聊"]:
+        if content.startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+    if not content:
+        await _send(event, "...格式：/加私聊 @某人")
+        return
+    m = re.search(r'\[CQ:at,qq=(\d+)\]', content) or re.search(r'(\d{5,12})', content)
+    if not m:
+        await _send(event, "...无法识别QQ号。")
+        return
+    target = m.group(1)
+    from .config import CHAT_WHITELIST, _save_chat_whitelist
+    if target in CHAT_WHITELIST:
+        await _send(event, "...已经在私聊白名单里了。")
+        return
+    CHAT_WHITELIST.append(target)
+    _save_chat_whitelist()
+    await _send(event, f"...已添加 {target} 到私聊白名单。")
+
+async def _cmd_remove_private(event: MessageEvent):
+    """移除私聊白名单：/撤私聊 @某人"""
+    if not check_admin(str(event.user_id)):
+        await _send(event, "...你不是管理员。")
+        return
+    content = str(event.message).strip()
+    for prefix in ["撤私聊", "移除私聊"]:
+        if content.startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+    if not content:
+        await _send(event, "...格式：/撤私聊 @某人")
+        return
+    m = re.search(r'\[CQ:at,qq=(\d+)\]', content) or re.search(r'(\d{5,12})', content)
+    if not m:
+        await _send(event, "...无法识别QQ号。")
+        return
+    target = m.group(1)
+    from .config import CHAT_WHITELIST, _save_chat_whitelist
+    if target not in CHAT_WHITELIST:
+        await _send(event, "...不在私聊白名单里。")
+        return
+    CHAT_WHITELIST.remove(target)
+    _save_chat_whitelist()
+    await _send(event, f"...已将 {target} 从私聊白名单移除。")
+
+add_private_cmd = _register("加私聊", _cmd_add_private, aliases=["添加私聊"], admin_only=True)
+remove_private_cmd = _register("撤私聊", _cmd_remove_private, aliases=["移除私聊"], admin_only=True)

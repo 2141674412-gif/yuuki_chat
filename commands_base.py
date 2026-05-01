@@ -85,6 +85,34 @@ if not superusers:
 
 logger.info(f"[启动] superusers={superusers}")
 
+# ========== admins（管理员，superuser自动拥有管理员权限） ==========
+ADMINS_FILE = os.path.join(_DATA_DIR, "admins.json")
+
+admins: list[str] = []
+try:
+    if os.path.isfile(ADMINS_FILE):
+        with open(ADMINS_FILE, "r", encoding="utf-8") as _f:
+            admins = json.load(_f)
+        admins = [str(a) for a in admins]
+except Exception:
+    admins = []
+
+def _save_admins():
+    """保存管理员列表"""
+    try:
+        with open(ADMINS_FILE, "w", encoding="utf-8") as _f:
+            json.dump(admins, _f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"[管理员] 保存失败: {e}")
+
+def check_admin(user_id: str) -> bool:
+    """检查用户是否为管理员（包括superuser）"""
+    return str(user_id) in superusers or str(user_id) in admins
+
+def check_owner(user_id: str) -> bool:
+    """检查用户是否为主人（仅superuser）"""
+    return str(user_id) in superusers
+
 # ========== 频率限制（防刷屏） ==========
 
 _rate_limit = {}  # {user_id: last_cmd_time}
@@ -291,7 +319,7 @@ def _register(name, handler, aliases=None, priority=5, admin_only=False):
             if gid and gid not in ALLOWED_GROUPS:
                 logger.debug(f"[命令] 群 {gid} 不在白名单，忽略")
                 return  # 不在白名单群里，静默忽略
-        if admin_only and not check_superuser(str(event.user_id)):
+        if admin_only and not check_admin(str(event.user_id)):
             await _send_msg(event, "...你不是管理员。")
             return
         # 黑名单检查（管理员不受限）

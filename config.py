@@ -198,14 +198,25 @@ DATA_DIR = _DATA_DIR
 
 # ========== 个人白名单 ==========
 
-CHAT_WHITELIST_FILE = os.path.join(DATA_DIR, "chat_whitelist.json")
-CHAT_WHITELIST = set()
-try:
-    if os.path.exists(CHAT_WHITELIST_FILE):
-        with open(CHAT_WHITELIST_FILE, "r", encoding="utf-8") as _f:
-            CHAT_WHITELIST = set(json.load(_f))
-except Exception:
-    pass
+_CHAT_WHITELIST_FILE = os.path.join(DATA_DIR, "chat_whitelist.json")
+
+def _load_chat_whitelist():
+    if os.path.isfile(_CHAT_WHITELIST_FILE):
+        try:
+            with open(_CHAT_WHITELIST_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def _save_chat_whitelist():
+    try:
+        with open(_CHAT_WHITELIST_FILE, "w", encoding="utf-8") as f:
+            json.dump(CHAT_WHITELIST, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+CHAT_WHITELIST = _load_chat_whitelist()
 
 logger.info(f"[启动] whitelist={CHAT_WHITELIST}")
 
