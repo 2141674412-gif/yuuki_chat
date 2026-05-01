@@ -11,7 +11,7 @@ from nonebot import logger
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
 
 # 从子模块导入
-from .commands_base import _register, check_superuser
+from .commands_base import _register, check_superuser, check_owner
 
 # 安全配置
 # 允许执行的命令白名单（正则），空列表表示允许所有（仅限管理员）
@@ -48,8 +48,8 @@ def _is_cmd_allowed(cmd: str) -> bool:
 
 async def _cmd_run(event: MessageEvent):
     """远程执行命令：/run <命令>"""
-    if not check_superuser(str(event.user_id)):
-        await _send(event, "...你不是管理员。")
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能执行。")
         return
 
     content = str(event.message).strip()
@@ -131,8 +131,8 @@ run_cmd = _register("run", _cmd_run, aliases=["执行"], priority=1, admin_only=
 
 async def _cmd_exec(event: MessageEvent):
     """执行上传的脚本：发脚本文件给bot（需@），自动执行"""
-    if not check_superuser(str(event.user_id)):
-        await _send(event, "...你不是管理员。")
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能执行脚本。")
         return
 
     # 检查消息是否包含文件

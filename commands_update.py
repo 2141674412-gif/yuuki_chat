@@ -18,7 +18,7 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, Message
 from nonebot.exception import FinishedException
 
 # 从子模块导入
-from .commands_base import _register, check_superuser, _get_http_client, _save_json, _load_json, _DATA_DIR, superusers
+from .commands_base import _register, check_superuser, check_owner, _get_http_client, _save_json, _load_json, _DATA_DIR, superusers
 
 
 async def _send(event, msg):
@@ -342,6 +342,9 @@ def _do_restart(user_id, event):
 
 async def _cmd_update(event: MessageEvent):
     """自动更新插件"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能更新。")
+        return
     user_id = str(event.user_id)
     logger.info(f"[更新] 收到更新请求 from {user_id}")
 
@@ -529,6 +532,9 @@ _cmd_update_status_cmd = _register("更新状态", _cmd_update_status, priority=
 
 async def _cmd_set_update_url(event: MessageEvent):
     """设置更新下载地址"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能设置。")
+        return
     content = str(event.message).strip()
     for prefix in ["设置更新地址", "seturl"]:
         if content.lower().startswith(prefix.lower()):

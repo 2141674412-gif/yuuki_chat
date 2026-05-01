@@ -12,7 +12,7 @@ from nonebot import get_bot, logger
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageEvent
 
 # 从子模块导入
-from .commands_base import _register, check_superuser, _DATA_DIR, superusers
+from .commands_base import _register, check_superuser, check_owner, _DATA_DIR, superusers
 
 
 BACKUP_DIR = os.path.join(_DATA_DIR, "backups")
@@ -120,6 +120,9 @@ EXPORT_FILES = [
 
 async def _cmd_export(event: MessageEvent):
     """导出数据：/导出"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能导出数据。")
+        return
     if not isinstance(event, GroupMessageEvent):
         await _send(event, "...导出命令只能在群里用。")
         return
@@ -154,8 +157,8 @@ async def _cmd_export(event: MessageEvent):
 
 async def _cmd_import(event: MessageEvent):
     """导入数据：/导入（需要上传zip文件）"""
-    if not check_superuser(str(event.user_id)):
-        await _send(event, "...你不是管理员。")
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能导入数据。")
         return
     # 检查是否有文件
     file_seg = None

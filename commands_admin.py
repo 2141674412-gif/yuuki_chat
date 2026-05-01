@@ -37,6 +37,9 @@ view_persona_cmd = _register("查看人设", _cmd_view_persona, priority=1, admi
 # -- 修改人设 --
 
 async def _cmd_set_persona(event: MessageEvent):
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能修改人设。")
+        return
     new_persona = str(event.message).replace("修改人设", "").strip()
 
     if not new_persona:
@@ -60,6 +63,9 @@ set_persona_cmd = _register("修改人设", _cmd_set_persona, priority=1, admin_
 # -- 重置人设 --
 
 async def _cmd_reset_persona(event: MessageEvent):
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能重置人设。")
+        return
     try:
         if os.path.exists(PERSONA_FILE):
             os.remove(PERSONA_FILE)
@@ -75,6 +81,9 @@ reset_persona_cmd = _register("重置人设", _cmd_reset_persona, priority=1, ad
 # -- 重启 --
 
 async def _cmd_restart(event: MessageEvent):
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能重启。")
+        return
     user_id = str(event.user_id)
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -304,6 +313,9 @@ blacklist_list_cmd = _register("黑名单", _cmd_blacklist_list, priority=1, adm
 
 async def _cmd_migrate_data(event: MessageEvent):
     """手动迁移数据到新路径"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能迁移数据。")
+        return
     from .commands_base import _migrate_data
     _migrate_data()
     await _send(event, f"[OK] 数据迁移完成。\n当前数据目录: {_DATA_DIR}\n文件列表: {os.listdir(_DATA_DIR)}")
