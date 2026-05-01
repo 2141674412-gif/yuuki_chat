@@ -77,8 +77,12 @@ async def _cmd_mqtt_off(event: MessageEvent):
 
 async def _cmd_fan_on(event: MessageEvent):
     """开风扇"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能控制。")
+        return
+
     if not _mqtt_enabled:
-        await _send(event, "...MQTT控制未开启，请管理员先 /mqtt开")
+        await _send(event, "...MQTT控制未开启，请先 /mqtt开")
         return
     success = await _mqtt_publish(DEFAULT_TOPIC, "启动")
     if success:
