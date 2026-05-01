@@ -453,5 +453,20 @@ async def _cmd_remove_private(event: MessageEvent):
     _save_chat_whitelist()
     await _send(event, f"...已将 {target} 从私聊白名单移除。")
 
+async def _cmd_list_private(event: MessageEvent):
+    """查看私聊白名单：/私聊列表"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能查看。")
+        return
+    from .config import CHAT_WHITELIST
+    if not CHAT_WHITELIST:
+        await _send(event, "...私聊白名单为空。")
+        return
+    lines = ["【私聊白名单】"]
+    for uid in CHAT_WHITELIST:
+        lines.append(f"  {uid}")
+    await _send(event, "\n".join(lines))
+
 add_private_cmd = _register("加私聊", _cmd_add_private, aliases=["添加私聊"], admin_only=True)
 remove_private_cmd = _register("撤私聊", _cmd_remove_private, aliases=["移除私聊"], admin_only=True)
+list_private_cmd = _register("私聊列表", _cmd_list_private, aliases=["查看私聊"], admin_only=True)
