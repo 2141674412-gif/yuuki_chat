@@ -62,6 +62,9 @@ async def _cmd_wzry(event: MessageEvent):
         return
 
     content = str(event.message).strip()
+    # 去掉开头的 /
+    if content.startswith("/"):
+        content = content[1:].strip()
     for prefix in ["王者", "wzry", "王者荣耀"]:
         if content.lower().startswith(prefix):
             content = content[len(prefix):].strip()
@@ -118,6 +121,8 @@ async def _cmd_wzry_profile(event: MessageEvent):
         return
 
     content = str(event.message).strip()
+    if content.startswith("/"):
+        content = content[1:].strip()
     for prefix in ["王者资料", "wzry资料"]:
         if content.lower().startswith(prefix):
             content = content[len(prefix):].strip()
@@ -191,6 +196,8 @@ async def _cmd_wzry_battle(event: MessageEvent):
         return
 
     content = str(event.message).strip()
+    if content.startswith("/"):
+        content = content[1:].strip()
     for prefix in ["王者战绩", "wzry战绩"]:
         if content.lower().startswith(prefix):
             content = content[len(prefix):].strip()
