@@ -3,6 +3,7 @@ import threading
 import asyncio
 from nonebot import get_bot
 from nonebot.adapters.onebot.v11 import MessageEvent
+from .commands_base import _register, check_owner
 
 # MQTT配置
 MQTT_BROKER = "broker.emqx.io"
@@ -92,6 +93,9 @@ async def _cmd_fan_on(event: MessageEvent):
 
 async def _cmd_fan_off(event: MessageEvent):
     """关风扇"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能控制。")
+        return
     if not _mqtt_enabled:
         await _send(event, "...MQTT控制未开启，请管理员先 /mqtt开")
         return
@@ -103,6 +107,9 @@ async def _cmd_fan_off(event: MessageEvent):
 
 async def _cmd_fan_speed(event: MessageEvent):
     """调速风扇：/风速 128"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能控制。")
+        return
     if not _mqtt_enabled:
         await _send(event, "...MQTT控制未开启，请管理员先 /mqtt开")
         return
@@ -128,6 +135,9 @@ async def _cmd_fan_speed(event: MessageEvent):
 
 async def _cmd_fan_status(event: MessageEvent):
     """查询风扇状态"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能控制。")
+        return
     if not _mqtt_enabled:
         await _send(event, "...MQTT控制未开启，请管理员先 /mqtt开")
         return
@@ -173,7 +183,6 @@ async def _cmd_mqtt(event: MessageEvent):
         await _send(event, "...MQTT连接失败。")
 
 # ========== 注册命令（全部仅管理员） ==========
-from .commands_base import _register, check_owner
 
 mqtt_on_cmd = _register("mqtt开", _cmd_mqtt_on, aliases=["MQTT开", "mqtt开启"], admin_only=True)
 mqtt_off_cmd = _register("mqtt关", _cmd_mqtt_off, aliases=["MQTT关", "mqtt关闭"], admin_only=True)
