@@ -25,7 +25,7 @@ _BLESSED_FILE = os.path.join(_DATA_DIR, "birthday_blessed.json")
 
 async def _send(event, msg):
     """发送消息辅助函数"""
-    from nonebot import get_bot
+    from nonebot import get_bot, get_bots
     bot = get_bot()
     if hasattr(event, 'group_id'):
         await bot.send_group_msg(group_id=event.group_id, message=msg)
@@ -225,7 +225,11 @@ async def _check_birthdays():
         _blessed[date_key] = {}
 
     try:
-        bot = get_bot()
+        bots = get_bots()
+        if not bots:
+            logger.warning("[生日] 无法获取bot实例")
+            return
+        bot = list(bots.values())[0]
     except Exception:
         logger.warning("[生日] 无法获取bot实例")
         return
