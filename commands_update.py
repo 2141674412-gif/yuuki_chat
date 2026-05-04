@@ -546,6 +546,11 @@ async def _cmd_set_update_url(event: MessageEvent):
         await _send(event, f"...当前更新地址：{url}\n用法：/设置更新地址 URL")
         return
 
+    # 简单URL格式校验
+    if not content.startswith("http://") and not content.startswith("https://"):
+        await _send(event, "...URL格式不对，需要以 http:// 或 https:// 开头。")
+        return
+
     _set_update_url(content)
     await _send(event, f"...已设置更新地址：{content}")
 

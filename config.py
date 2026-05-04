@@ -2,7 +2,6 @@ import json
 import os
 import logging
 import tempfile
-
 logger = logging.getLogger("yuuki_chat.config")
 
 # ========== 路径配置 ==========
@@ -205,8 +204,8 @@ def _load_chat_whitelist():
         try:
             with open(_CHAT_WHITELIST_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[配置] 加载私聊白名单失败: {e}")
     return []
 
 def _save_chat_whitelist():

@@ -273,7 +273,8 @@ async def _on_keyword_filter(bot: Bot, event: _GME):
     if not gid or gid not in ALLOWED_GROUPS:
         return
     # 管理员不受过滤
-    if str(event.user_id) in superusers:
+    from .commands_base import check_admin
+    if str(event.user_id) in superusers or check_admin(str(event.user_id)):
         return
     # 黑名单用户不受过滤（已不处理）
     from .commands_base import user_blacklist

@@ -58,11 +58,12 @@ async def _cmd_wordcloud(event: MessageEvent):
 
     # 从群消息记录中读取数据
     try:
-        from .chat import _group_chat_log
+        from .chat import _group_chat_log as _gcl
     except ImportError:
-        _group_chat_log = {}
+        await _send(event, "...无法获取聊天记录。")
+        return
 
-    group_messages = _group_chat_log.get(group_id, [])
+    group_messages = _gcl.get(group_id, [])
     if not group_messages:
         await _send(event, "...暂时没有群聊天记录可以统计。")
         return

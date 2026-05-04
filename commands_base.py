@@ -122,7 +122,7 @@ def _check_rate_limit(user_id: str) -> bool:
     """检查频率限制，返回 True 表示放行"""
     now = time.time()
     # 清理超过1小时的过期条目，防止内存泄漏
-    if len(_rate_limit) > 1000:
+    if len(_rate_limit) > 200:
         expired = [k for k, v in _rate_limit.items() if now - v > 3600]
         for k in expired:
             del _rate_limit[k]

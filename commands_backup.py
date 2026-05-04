@@ -126,9 +126,6 @@ async def _cmd_export(event: MessageEvent):
     if not isinstance(event, GroupMessageEvent):
         await _send(event, "...导出命令只能在群里用。")
         return
-    if not check_superuser(str(event.user_id)):
-        await _send(event, "...你不是管理员。")
-        return
     try:
         export_path = os.path.join(_DATA_DIR, "export_temp.zip")
         with zipfile.ZipFile(export_path, "w", zipfile.ZIP_DEFLATED) as zf:
