@@ -10,7 +10,7 @@ import os
 from nonebot import logger
 from nonebot.adapters.onebot.v11 import MessageEvent
 
-from .commands_base import _register, _DATA_DIR, check_owner
+from .commands_base import _register, _DATA_DIR, check_owner, send_msg as _send
 
 
 # 数据文件路径
@@ -37,15 +37,6 @@ def _load_dongle_data():
         logger.error(f"[查机台] 加载数据失败: {e}")
         return None
 
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 def _search(data_list, keyword):

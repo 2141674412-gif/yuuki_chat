@@ -9,7 +9,7 @@ from nonebot.adapters.onebot.v11 import MessageEvent, ActionFailed
 
 from nonebot.exception import FinishedException
 
-from .commands_base import _register, _get_http_client, _DATA_DIR, _load_json, _save_json
+from .commands_base import _register, _get_http_client, _DATA_DIR, _load_json, _save_json, send_msg as _send
 from .commands_schedule import _get_scheduler
 
 import os
@@ -24,15 +24,6 @@ _WEATHER_BINDS_FILE = os.path.join(_DATA_DIR, "weather_binds.json")
 _WEATHER_USER_FILE = os.path.join(_DATA_DIR, "weather_user_binds.json")
 # 个人绑定: {user_id: {"city": "上海"}}
 
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 def _load_weather_binds() -> dict:

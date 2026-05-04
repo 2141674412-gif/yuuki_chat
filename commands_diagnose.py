@@ -11,20 +11,11 @@ from nonebot import logger, get_driver
 from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import MessageEvent
 
-from .commands_base import _register, check_superuser, check_owner, _DATA_DIR
+from .commands_base import _register, check_superuser, check_owner, _DATA_DIR, send_msg as _send
 import asyncio
 
 # ─────────────────────────────────────────────────────────────
 
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 def _check_code_bugs():

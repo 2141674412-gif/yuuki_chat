@@ -7,7 +7,7 @@ import re
 from nonebot.adapters.onebot.v11 import MessageEvent
 from nonebot.exception import FinishedException
 
-from .commands_base import _register
+from .commands_base import _register, send_msg as _send
 
 
 _SAFE_OPERATORS = {
@@ -17,16 +17,6 @@ _SAFE_OPERATORS = {
     ast.Pow: operator.pow, ast.USub: operator.neg, ast.UAdd: operator.pos,
 }
 
-
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 def _safe_eval_node(node: ast.AST) -> float:

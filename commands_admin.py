@@ -11,22 +11,13 @@ import sys
 from nonebot.adapters.onebot.v11 import MessageEvent
 
 # 从子模块导入
-from .commands_base import _register, check_superuser, check_admin, check_owner, _save_blacklist, user_blacklist, admins, _save_admins, superusers, _DATA_DIR
+from .commands_base import _register, check_superuser, check_admin, check_owner, _save_blacklist, user_blacklist, admins, _save_admins, superusers, _DATA_DIR, send_msg as _send
 from .config import load_persona, save_persona, PERSONA_FILE
 from .chat import chat_history
 
 
 # ========== 查看当前人设 ==========
 
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 async def _cmd_view_persona(event: MessageEvent):

@@ -14,7 +14,7 @@ from nonebot import logger
 from nonebot.adapters.onebot.v11 import MessageEvent
 
 # 从子模块导入
-from .commands_base import _register, _load_json, _save_json, _DATA_DIR
+from .commands_base import _register, _load_json, _save_json, _DATA_DIR, send_msg as _send
 
 
 VAULT_FILE = os.path.join(_DATA_DIR, "vault.enc")
@@ -22,15 +22,6 @@ VAULT_FILE = os.path.join(_DATA_DIR, "vault.enc")
 _vault_cache = None  # 进程级缓存，避免重复IO
 _vault_cache_mtime = 0  # 文件修改时间，用于失效检查
 
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 def _load_vault():

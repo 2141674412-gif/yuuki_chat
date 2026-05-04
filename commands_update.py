@@ -18,17 +18,8 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, Message
 from nonebot.exception import FinishedException
 
 # 从子模块导入
-from .commands_base import _register, check_superuser, check_owner, _get_http_client, _save_json, _load_json, _DATA_DIR, superusers
+from .commands_base import _register, check_superuser, check_owner, _get_http_client, _save_json, _load_json, _DATA_DIR, superusers, send_msg as _send
 
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 # GitHub 仓库配置

@@ -11,7 +11,7 @@ from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import MessageEvent
 
 # 从子模块导入
-from .commands_base import _register
+from .commands_base import _register, send_msg as _send
 
 
 # 中文停用词集合
@@ -36,15 +36,6 @@ _STOP_WORDS = set(
     "some such no nor not only own same so than too very s t m re ve ll d"
 )
 
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 async def _cmd_wordcloud(event: MessageEvent):

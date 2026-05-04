@@ -3,7 +3,7 @@ import threading
 import asyncio
 from nonebot import get_bot
 from nonebot.adapters.onebot.v11 import MessageEvent
-from .commands_base import _register, check_owner
+from .commands_base import _register, check_owner, send_msg as _send
 
 # MQTT配置
 MQTT_BROKER = "broker.emqx.io"
@@ -20,14 +20,6 @@ _mqtt_enabled = False
 _mqtt_client = None
 _mqtt_connected = False
 _mqtt_lock = threading.Lock()
-
-async def _send(event, msg):
-    """发送消息"""
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 def _get_mqtt_client():
     """获取或创建MQTT客户端"""

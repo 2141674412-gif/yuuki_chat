@@ -24,6 +24,7 @@ from .commands_base import (
     _load_reminders, _save_reminders,
     _load_points, _save_points, user_points,
     _check_rate_limit,
+    send_msg as _send,
 )
 
 # 内部模块
@@ -35,15 +36,6 @@ from .utils import get_font, make_default_cover
 
 # -- 帮助 --
 
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 async def _cmd_help(event: MessageEvent):

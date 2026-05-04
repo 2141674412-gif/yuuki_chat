@@ -9,7 +9,7 @@ from datetime import datetime
 from nonebot import logger, get_bot
 from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent
 
-from .commands_base import _register, _DATA_DIR, _load_json, _save_json
+from .commands_base import _register, _DATA_DIR, _load_json, _save_json, send_msg as _send
 from .commands_schedule import _get_scheduler
 from .config import ALLOWED_GROUPS
 
@@ -21,16 +21,6 @@ _BIRTHDAY_FILE = os.path.join(_DATA_DIR, "birthdays.json")
 _BLESSED_FILE = os.path.join(_DATA_DIR, "birthday_blessed.json")
 # {"YYYY-MM-DD": {group_id: [user_id, ...]}}
 
-
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot, get_bots
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 def _load_birthdays() -> dict:

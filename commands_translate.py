@@ -9,21 +9,11 @@ from nonebot import logger
 from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import MessageEvent
 
-from .commands_base import _register, _get_http_client
+from .commands_base import _register, _get_http_client, send_msg as _send
 
 _translate_cache = {}  # {f"{text}|{lang}": {"result": str, "time": float}}
 _TRANSLATE_TTL = 300  # 5分钟
 
-
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 async def _translate_api1(text, target_lang):

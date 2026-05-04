@@ -7,7 +7,7 @@ import re
 from nonebot.adapters.onebot.v11 import MessageEvent
 from nonebot import logger
 
-from .commands_base import _register, _save_reminders, reminders
+from .commands_base import _register, _save_reminders, reminders, send_msg as _send
 
 
 def _cleanup_expired_reminders():
@@ -31,15 +31,6 @@ _cleanup_expired_reminders()
 
 # -- 提醒 --
 
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 async def _cmd_remind(event: MessageEvent):

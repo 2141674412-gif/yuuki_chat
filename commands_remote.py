@@ -11,7 +11,7 @@ from nonebot import logger
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
 
 # 从子模块导入
-from .commands_base import _register, check_superuser, check_owner
+from .commands_base import _register, check_superuser, check_owner, send_msg as _send
 
 # 安全配置
 # 允许执行的命令白名单（正则），空列表表示允许所有（仅限管理员）
@@ -27,16 +27,6 @@ _MAX_SCRIPT_SIZE = 100 * 1024  # 100KB
 # 允许的脚本扩展名
 _ALLOWED_SCRIPT_EXT = {'.py', '.sh', '.bat', '.ps1', '.js', '.lua', '.rb', '.go'}
 
-
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 def _is_cmd_allowed(cmd: str) -> bool:

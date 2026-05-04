@@ -16,18 +16,9 @@ from .commands_base import (
     _register,
     _save_checkin_records, _save_points,
     user_points, checkin_records,
+    send_msg as _send,
 )
 
-
-
-async def _send(event, msg):
-    """发送消息辅助函数"""
-    from nonebot import get_bot
-    bot = get_bot()
-    if hasattr(event, 'group_id'):
-        await bot.send_group_msg(group_id=event.group_id, message=msg)
-    else:
-        await bot.send_private_msg(user_id=event.user_id, message=msg)
 
 
 def _mask_qq(qq: str) -> str:
@@ -75,7 +66,7 @@ async def _cmd_checkin(event: MessageEvent):
     streak = checkin_records[user_id]["streak"]
 
     # 计算积分：递增奖励
-    # 连续签到 1-6 天：+10 积分
+    # 连续签到基础 +10，每7天额外递增
     # 连续签到 7 天（一周）：+50 积分
     # 连续签到 30 天（一月）：+200 积分
     if streak % 30 == 0:
@@ -85,7 +76,9 @@ async def _cmd_checkin(event: MessageEvent):
         total = 50
         bonus_desc = "（周签奖励 +50）"
     else:
-        total = 10
+        # 连续签到越长，基础积分越高
+        base = 10 + min((streak // 7) * 5, 25)  # 每7天多+5，最多+25
+        total = base
         bonus_desc = ""
     user_points[user_id] += total
 
