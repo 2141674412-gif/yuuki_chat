@@ -1,10 +1,12 @@
 """commands_checkin - 签到积分模块
 
-包含签到、积分查询、积分排行榜命令。
+包含签到、积分查询、积分排行榜、签到提醒命令。
 """
 
 # 标准库
+import asyncio
 import random
+import re
 from datetime import datetime, timedelta
 
 # 第三方库
@@ -157,3 +159,154 @@ async def _cmd_ranking(event: MessageEvent):
     await _send(event, msg.strip())
 
 ranking_cmd = _register("排行", _cmd_ranking, aliases=["排行榜", "排名"])
+
+
+# ========== 签到提醒 ==========
+
+from .commands_schedule import _get_scheduler
+
+
+async def _send_checkin_remind(user_id: str):
+    """发送签到提醒（私聊优先，失败则群@）"""
+    from nonebot import get_bot, get_bots
+    try:
+        bots = get_bots()
+        if not bots:
+            logger.warning("[签到提醒] 获取bot实例失败")
+            return
+        bot = list(bots.values())[0]
+    except Exception:
+        logger.warning("[签到提醒] 获取bot实例失败")
+        return
+
+    msg = "...该签到啦。今天的运势在等着你。"
+    try:
+        await bot.send_private_msg(user_id=int(user_id), message=msg)
+        logger.info(f"[签到提醒] 已向用户 {user_id} 发送签到提醒（私聊）")
+    except Exception as e:
+        logger.warning(f"[签到提醒] 向用户 {user_id} 发送私聊失败：{e}，尝试群消息")
+        sent = False
+        try:
+            from .config import ALLOWED_GROUPS
+            for gid in ALLOWED_GROUPS:
+                try:
+                    await bot.send_group_msg(
+                        group_id=gid,
+                        message=f"[CQ:at,qq={user_id}] {msg}",
+                    )
+                    logger.info(f"[签到提醒] 已通过群 {gid} 向用户 {user_id} 发送签到提醒")
+                    sent = True
+                    break
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        if not sent:
+            logger.warning(f"[签到提醒] 向用户 {user_id} 发送签到提醒完全失败")
+
+
+async def _cmd_checkin_remind(event: MessageEvent):
+    """设置每日签到提醒：/签到提醒 08:00 或 /签到提醒 关"""
+    user_id = str(event.user_id)
+    content = str(event.message).strip()
+    for prefix in ["签到提醒"]:
+        if content.startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+
+    if not content:
+        # 查看当前设置
+        remind_time = checkin_records.get(user_id, {}).get("remind_time", "")
+        if remind_time:
+            await _send(event, f"你的签到提醒时间：每天 {remind_time}\n发送 /签到提醒 关 可以关闭。")
+        else:
+            await _send(event, "你还没设置签到提醒。\n用法：/签到提醒 08:00")
+        return
+
+    if content in ("关", "关闭", "off", "取消"):
+        if user_id in checkin_records and checkin_records[user_id].get("remind_time"):
+            old_time = checkin_records[user_id].pop("remind_time")
+            _save_checkin_records()
+            try:
+                _get_scheduler().remove_job(f"checkin_remind_{user_id}")
+            except Exception:
+                pass
+            await _send(event, f"已关闭签到提醒（原时间 {old_time}）。")
+        else:
+            await _send(event, "...你本来就没设置签到提醒。")
+        return
+
+    # 解析时间 HH:MM
+    m = re.match(r'^(\d{1,2}):(\d{2})$', content)
+    if not m:
+        await _send(event, "时间格式不对。用法：/签到提醒 08:00\n关闭：/签到提醒 关")
+        return
+
+    h, mi = int(m.group(1)), int(m.group(2))
+    if not (0 <= h <= 23 and 0 <= mi <= 59):
+        await _send(event, "...时间范围不对。小时 0-23，分钟 0-59。")
+        return
+
+    time_str = f"{h:02d}:{mi:02d}"
+
+    if user_id not in checkin_records:
+        checkin_records[user_id] = {}
+
+    checkin_records[user_id]["remind_time"] = time_str
+    _save_checkin_records()
+
+    # 注册 APScheduler 每日定时任务
+    try:
+        _get_scheduler().add_job(
+            _send_checkin_remind,
+            "cron",
+            hour=h,
+            minute=mi,
+            args=[user_id],
+            id=f"checkin_remind_{user_id}",
+            replace_existing=True,
+        )
+        logger.info(f"[签到提醒] 已为用户 {user_id} 设置每日 {time_str} 签到提醒")
+    except Exception as e:
+        logger.error(f"[签到提醒] APScheduler 注册失败：{e}")
+
+    await _send(event, f"记住了。每天 {time_str} 会提醒你签到。\n发送 /签到提醒 关 可以关闭。")
+
+
+checkin_remind_cmd = _register("签到提醒", _cmd_checkin_remind)
+
+
+def _restore_checkin_reminders():
+    """启动时恢复所有用户的签到提醒"""
+    restored = 0
+    for user_id, record in checkin_records.items():
+        remind_time = record.get("remind_time")
+        if not remind_time:
+            continue
+        try:
+            h, mi = remind_time.split(":")
+            h, mi = int(h), int(mi)
+            _get_scheduler().add_job(
+                _send_checkin_remind,
+                "cron",
+                hour=h,
+                minute=mi,
+                args=[user_id],
+                id=f"checkin_remind_{user_id}",
+                replace_existing=True,
+            )
+            restored += 1
+            logger.info(f"[签到提醒] 恢复用户 {user_id} 的签到提醒：{remind_time}")
+        except Exception as e:
+            logger.error(f"[签到提醒] 恢复用户 {user_id} 的签到提醒失败：{e}")
+    if restored:
+        logger.info(f"[签到提醒] 共恢复 {restored} 个签到提醒")
+
+
+# 在 bot 启动时恢复签到提醒
+from nonebot import get_driver
+_driver = get_driver()
+
+@_driver.on_startup
+async def _on_startup_restore_checkin_reminders():
+    _restore_checkin_reminders()
