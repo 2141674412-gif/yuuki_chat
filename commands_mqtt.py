@@ -151,6 +151,9 @@ async def _cmd_fan_status(event: MessageEvent):
 
 async def _cmd_mqtt(event: MessageEvent):
     """通用MQTT发布：/mqtt 主题 消息"""
+    if not check_owner(str(event.user_id)):
+        await _send(event, "...只有主人才能控制。")
+        return
     content = str(event.message).strip()
     for prefix in ["mqtt", "MQTT"]:
         if content.startswith(prefix):
