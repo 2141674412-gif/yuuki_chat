@@ -153,7 +153,7 @@ async def _cmd_record(event: MessageEvent):
         "amount": amount,
         "category": category,
         "note": note,
-        "date": now.strftime("%m-%d %H:%M"),
+        "date": now.strftime("%Y-%m-%d %H:%M"),
         "type": record_type,
     }
 
@@ -181,17 +181,17 @@ async def _cmd_bill(event: MessageEvent):
         return
 
     now = datetime.now()
-    today_str = now.strftime("%m-%d")
+    today_str = now.strftime("%Y-%m-%d")
 
     # 过滤记录
     filtered = records
     if "今天" in content or "今日" in content:
         filtered = [r for r in records if r["date"].startswith(today_str)]
     elif "昨天" in content or "昨日" in content:
-        yesterday = (now - timedelta(days=1)).strftime("%m-%d")
+        yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
         filtered = [r for r in records if r["date"].startswith(yesterday)]
     elif "本月" in content or "这个月" in content:
-        month_prefix = now.strftime("%m-")
+        month_prefix = now.strftime("%Y-%m-")
         filtered = [r for r in records if r["date"].startswith(month_prefix)]
 
     if not filtered:
@@ -279,7 +279,7 @@ async def _cmd_stats(event: MessageEvent):
 
     now = datetime.now()
     # 过滤本月
-    month_prefix = now.strftime("%m-")
+    month_prefix = now.strftime("%Y-%m-")
     if "本月" in content or "这个月" in content:
         filtered = [r for r in records if r["date"].startswith(month_prefix)]
     else:
@@ -328,16 +328,29 @@ async def _cmd_stats(event: MessageEvent):
 
 
 async def _cmd_delete_record(event: MessageEvent):
-    """删除最近一条记录：/删记录"""
+    """删除记录：/删记录 1 (删除最近第1条)"""
+    content = str(event.message).strip()
+    for prefix in ["删记录", "delrecord", "删除记录"]:
+        if content.startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+
     uid = str(event.user_id)
     records = _accounting.get(uid, [])
     if not records:
         await _send(event, "...没有记录可删。")
         return
-    removed = records.pop()
+
+    # 解析要删除第几条（默认第1条，即最近一条）
+    n = 1
+    if content and content.isdigit():
+        n = int(content)
+        n = max(1, min(n, len(records)))
+
+    removed = records.pop(-n)
     _save_accounting(_accounting)
     sign = "+" if removed.get("type") == "income" else "-"
-    await _send(event, f"...已删除：{removed.get('category', '未分类')} {removed.get('note', '')} {sign}{removed.get('amount', 0)}")
+    await _send(event, f"...已删除第{n}条：{removed.get('category', '未分类')} {removed.get('note', '')} {sign}{removed.get('amount', 0)}")
 
 
 async def _cmd_clear_records(event: MessageEvent):
@@ -356,4 +369,4 @@ record_cmd = _register("记", _cmd_record, aliases=["记账", "记录"])
 bill_cmd = _register("账单", _cmd_bill, aliases=["账目", "明细"])
 stats_cmd = _register("统计", _cmd_stats, aliases=["汇总"])
 clear_cmd = _register("清空记账", _cmd_clear_records, aliases=["清除记账"])
-delete_record_cmd = _register("删记录", _cmd_delete_record, aliases=["删除记录"])
+delete_record_cmd = _register("删记录", _cmd_delete_record, aliases=["删除记录", "delrecord"])

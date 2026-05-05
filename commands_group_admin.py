@@ -161,21 +161,30 @@ from nonebot.adapters.onebot.v11 import GroupIncreaseNoticeEvent, GroupMessageEv
 
 import os
 
-_welcome_enabled = True  # 默认开启
-_welcome_msg = "欢迎 {nickname} 加入本群~"
+_welcome_config: dict = {}  # {group_id: {"enabled": bool, "msg": str}}
+_DEFAULT_WELCOME_MSG = "欢迎 {nickname} 加入本群~"
 
 def _load_welcome_config():
-    global _welcome_enabled, _welcome_msg
+    global _welcome_config
     try:
         cfg_file = os.path.join(_DATA_DIR, "group_welcome.json")
         if os.path.exists(cfg_file):
-            import json
-            with open(cfg_file, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
-                _welcome_enabled = cfg.get("enabled", True)
-                _welcome_msg = cfg.get("message", _welcome_msg)
+            cfg = _load_json(cfg_file)
+            if cfg and isinstance(cfg, dict):
+                _welcome_config = cfg
     except Exception as e:
         logger.debug(f"[群管] 加载欢迎配置失败: {e}")
+
+def _save_welcome_config():
+    try:
+        cfg_file = os.path.join(_DATA_DIR, "group_welcome.json")
+        _save_json(cfg_file, _welcome_config)
+    except Exception as e:
+        logger.debug(f"[群管] 保存欢迎配置失败: {e}")
+
+def _get_welcome_setting(group_id) -> dict:
+    """获取群的欢迎设置，无配置时返回默认"""
+    return _welcome_config.get(str(group_id), {"enabled": True, "msg": _DEFAULT_WELCOME_MSG})
 
 _load_welcome_config()
 
@@ -184,7 +193,8 @@ _welcome_notice = on_notice(priority=5)
 @_welcome_notice.handle()
 async def _on_group_increase(bot: Bot, event: GroupIncreaseNoticeEvent):
     """新成员入群自动欢迎"""
-    if not _welcome_enabled:
+    setting = _get_welcome_setting(event.group_id)
+    if not setting.get("enabled", True):
         return
     if event.sub_type != "approve":
         return
@@ -207,7 +217,8 @@ async def _on_group_increase(bot: Bot, event: GroupIncreaseNoticeEvent):
     except Exception:
         nickname = "新人"
 
-    msg = _welcome_msg.replace("{nickname}", nickname).replace("{user_id}", str(event.user_id))
+    welcome_msg = setting.get("msg", _DEFAULT_WELCOME_MSG)
+    msg = welcome_msg.replace("{nickname}", nickname).replace("{user_id}", str(event.user_id))
     try:
         await bot.send_group_msg(group_id=event.group_id, message=msg)
     except Exception as e:
@@ -287,57 +298,58 @@ async def _on_keyword_filter(bot: Bot, event: _GME):
                     )
                 except Exception as e:
                     logger.debug(f"[群管] 禁言失败: {e}")
-            # 通知管理员（群级30秒冷却）
+            # 通知管理员（私聊，不公开敏感词；群级30秒冷却）
             now_ts = time.time()
             if now_ts - _last_filter_notify.get(gid, 0) < 30:
                 return
-            try:
-                await bot.send_group_msg(
-                    group_id=gid,
-                    message=f"[关键词过滤] 检测到违规内容，已处理。\n用户: {event.user_id} | 匹配: {word}"
-                )
-                _last_filter_notify[gid] = now_ts
-            except Exception as e:
-                logger.debug(f"[群管] 通知管理员失败: {e}")
+            action_text = {"warn": "警告", "delete": "撤回", "ban": "撤回+禁言"}.get(_filter_action, _filter_action)
+            for su in superusers:
+                try:
+                    await bot.send_private_msg(
+                        user_id=int(su),
+                        message=f"[过滤通知] 群{event.group_id} 用户{event.user_id} 触发关键词过滤\n已执行: {action_text}"
+                    )
+                except Exception:
+                    pass
+            _last_filter_notify[gid] = now_ts
             return
 
 
 # ========== 群管配置命令 ==========
 
 async def _cmd_set_welcome(event: MessageEvent):
-    """设置欢迎语"""
-    global _welcome_enabled, _welcome_msg
+    """设置欢迎语（每群独立）"""
     content = str(event.message).strip()
     for prefix in ["设置欢迎", "setwelcome"]:
         if content.lower().startswith(prefix.lower()):
             content = content[len(prefix):].strip()
             break
 
+    gid = str(getattr(event, 'group_id', 0))
+    setting = _get_welcome_setting(gid)
+
     if not content:
         await _send(event, 
-            f"...当前欢迎语：{_welcome_msg}\n"
-            f"状态：{'开启' if _welcome_enabled else '关闭'}\n"
+            f"...当前欢迎语：{setting.get('msg', _DEFAULT_WELCOME_MSG)}\n"
+            f"状态：{'开启' if setting.get('enabled', True) else '关闭'}\n"
             f"用法：/设置欢迎 欢迎内容（{{nickname}}代表新人昵称）\n"
             f"      /设置欢迎 开启/关闭"
         )
         return
 
     if content in ("开启", "on"):
-        _welcome_enabled = True
+        _welcome_config.setdefault(gid, {"enabled": True, "msg": _DEFAULT_WELCOME_MSG})["enabled"] = True
+        _save_welcome_config()
         await _send(event, "...自动欢迎已开启。")
         return
     if content in ("关闭", "off"):
-        _welcome_enabled = False
+        _welcome_config.setdefault(gid, {"enabled": True, "msg": _DEFAULT_WELCOME_MSG})["enabled"] = False
+        _save_welcome_config()
         await _send(event, "...自动欢迎已关闭。")
         return
 
-    _welcome_msg = content
-    # 保存配置
-    try:
-        cfg_file = os.path.join(_DATA_DIR, "group_welcome.json")
-        _save_json(cfg_file, {"enabled": _welcome_enabled, "message": _welcome_msg})
-    except Exception as e:
-        logger.debug(f"[群管] 保存欢迎配置失败: {e}")
+    _welcome_config.setdefault(gid, {"enabled": True, "msg": _DEFAULT_WELCOME_MSG})["msg"] = content
+    _save_welcome_config()
     await _send(event, f"...欢迎语已设置：{content}")
 
 

@@ -33,6 +33,17 @@ from .config import ALLOWED_GROUPS, COMMAND_NAMES, load_persona, DATA_DIR, CHAT_
 from .commands_base import user_blacklist
 from .commands_sticker import get_sticker_message
 
+# ========== 统一bot提及检测 ==========
+def _is_bot_mentioned(event) -> bool:
+    """统一检测是否@了bot或提到了bot的名字"""
+    if getattr(event, 'to_me', False):
+        return True
+    text = str(event.message).strip().lower()
+    for name in ("希亚", "noa", "结城", "正义的伙伴", "帕菲女王"):
+        if name in text:
+            return True
+    return False
+
 # 预编译正则表达式
 _RE_AT_TAG = re.compile(r'\[at:qq=\d+\]')
 _RE_CQ_TAG = re.compile(r'\[CQ:[^\]]+\]')
@@ -563,7 +574,7 @@ async def handle_sleep_at(event: GroupMessageEvent):
         pass
 
     # 检查是否@了bot
-    if not getattr(event, 'to_me', False):
+    if not _is_bot_mentioned(event):
         return
 
     user_id = str(event.user_id)
@@ -629,7 +640,7 @@ async def handle_chat(event: MessageEvent):
     if not text_no_punct and len(plain_text) <= 20:
         # 纯表情/标点消息，不调AI
         return
-    if len(text_no_punct) <= 1 and not any(kw in plain_text for kw in ["希亚", "noa", "Noa"]):
+    if len(text_no_punct) <= 1 and not _is_bot_mentioned(event):
         # 单个字且不是叫bot名字，跳过
         return
 
@@ -646,7 +657,7 @@ async def handle_chat(event: MessageEvent):
                 _cleanup_group_chat_log()
 
     # 如果是群聊，需要@bot或提到希亚才回复
-    is_at_me = getattr(event, 'to_me', False) or "希亚" in message or "Noa" in message or "noa" in message
+    is_at_me = _is_bot_mentioned(event)
     if hasattr(event, 'group_id') and event.group_id:
         if not is_at_me:
             return
@@ -996,7 +1007,7 @@ chatter = on_message(priority=5, block=False)
 async def handle_chatter(event: GroupMessageEvent):
     """群聊智能插话：根据话题关键词判断是否回复"""
     # 如果消息 @ 了 bot，交给 handle_chat 处理，避免重复响应
-    if getattr(event, 'to_me', False):
+    if _is_bot_mentioned(event):
         return
 
     # 只在群聊中生效
@@ -1049,7 +1060,7 @@ async def handle_chatter(event: GroupMessageEvent):
         return
 
     # 检测是否提到bot名字（希亚/Noa/正义的伙伴等）
-    mentioned = any(name in msg_lower for name in _BOT_NAMES)
+    mentioned = _is_bot_mentioned(event)
 
     if mentioned:
         # 提到bot名字时，高概率回复（80%）
@@ -1421,9 +1432,9 @@ async def handle_image_chat(event: MessageEvent):
 
     # 截图记账模式：有图片+提到"记/记账" 或 纯图片（无文字）不需要@bot
     # 但如果被@了，强制走识图模式
-    _is_at_me = getattr(event, 'to_me', False)
+    _is_at_me = _is_bot_mentioned(event)
     _has_accounting_keyword = any(kw in plain for kw in ["记", "记账", "记录"])
-    _has_bot_mention = any(kw in plain for kw in ["希亚", "noa", "Noa", "结城", "正义的伙伴"])
+    _has_bot_mention = _is_bot_mentioned(event)
     # 去掉可能的QQ昵称后检查文字长度
     _short_text = len(plain) <= 10
     _accounting_mode = (_has_accounting_keyword or _short_text) and not _has_bot_mention and not _is_at_me
@@ -1433,8 +1444,8 @@ async def handle_image_chat(event: MessageEvent):
     # 但截图记账模式不需要@bot
     if gid and not _accounting_mode:
         msg_str = str(event.message)
-        is_at_me = getattr(event, 'to_me', False)
-        is_mentioned = any(name in msg_str for name in ["希亚", "noa", "Noa", "结城", "正义的伙伴"])
+        is_at_me = _is_bot_mentioned(event)
+        is_mentioned = _is_bot_mentioned(event)
         if not is_at_me and not is_mentioned:
             return
 

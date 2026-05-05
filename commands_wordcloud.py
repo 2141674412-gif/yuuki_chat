@@ -108,17 +108,15 @@ async def _cmd_wordcloud(event: MessageEvent):
         from PIL import Image, ImageDraw, ImageFont
         from .utils import get_font
 
-        img_width, img_height = 800, 400
+        img_width, img_height = 1200, 600
         img = Image.new("RGB", (img_width, img_height), "#1a1a2e")
         draw = ImageDraw.Draw(img)
 
         # 预定义一些好看的颜色
         _colors = [
-            "#e94560", "#0f3460", "#16213e", "#e94560",
-            "#533483", "#0f3460", "#e94560", "#16213e",
-            "#533483", "#e94560", "#0f3460", "#533483",
-            "#e94560", "#16213e", "#0f3460", "#533483",
-            "#e94560", "#0f3460", "#16213e", "#533483",
+            "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9",
+            "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9",
+            "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9",
         ]
 
         # 按词频从大到小排列，字号从大到小
@@ -149,9 +147,9 @@ async def _cmd_wordcloud(event: MessageEvent):
             return None
 
         for i, (word, count) in enumerate(top20):
-            # 字号：最大60，最小16
+            # 字号：最大80，最小20
             ratio = (count - min_count) / count_range if count_range else 1
-            font_size = int(16 + ratio * 44)
+            font_size = int(20 + ratio * 60)
             try:
                 font = get_font(font_size, bold=(ratio > 0.5))
             except Exception:

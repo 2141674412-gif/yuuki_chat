@@ -306,9 +306,20 @@ async def _send_weather_report(group_id: str):
             return
 
         bot = get_bot()
+
+        # 根据当前时段选择播报前缀
+        from datetime import datetime as _dt
+        _hour = _dt.now().hour
+        if 5 <= _hour < 12:
+            prefix = "🌅 早安天气播报"
+        elif 12 <= _hour < 18:
+            prefix = "☀️ 午后天气播报"
+        else:
+            prefix = "🌙 晚间天气播报"
+
         await bot.send_group_msg(
             group_id=int(group_id),
-            message=f"🌅 早安天气播报\n{weather_text}"
+            message=f"{prefix}\n{weather_text}"
         )
         logger.info(f"[天气] 已向群 {group_id} 播报 {city} 天气")
     except ActionFailed as e:
