@@ -38,7 +38,12 @@ def _is_bot_mentioned(event) -> bool:
     """统一检测是否@了bot或提到了bot的名字"""
     if getattr(event, 'to_me', False):
         return True
-    text = str(event.message).strip().lower()
+    # 只检查text段，避免CQ标签中的URL等误触发
+    text = ""
+    for seg in event.message:
+        if seg.type == "text":
+            text += seg.data.get("text", "")
+    text = text.strip().lower()
     for name in ("希亚", "noa", "结城", "正义的伙伴", "帕菲女王"):
         if name in text:
             return True
@@ -1434,19 +1439,15 @@ async def handle_image_chat(event: MessageEvent):
     # 但如果被@了，强制走识图模式
     _is_at_me = _is_bot_mentioned(event)
     _has_accounting_keyword = any(kw in plain for kw in ["记", "记账", "记录"])
-    _has_bot_mention = _is_bot_mentioned(event)
     # 去掉可能的QQ昵称后检查文字长度
     _short_text = len(plain) <= 10
-    _accounting_mode = (_has_accounting_keyword or _short_text) and not _has_bot_mention and not _is_at_me
+    _accounting_mode = (_has_accounting_keyword or _short_text) and not _is_at_me
     logger.info(f"[图片理解] plain='{plain}', accounting={_accounting_mode}, keyword={_has_accounting_keyword}")
 
     # 群聊需要@bot或提到bot名字才触发，私聊直接触发
     # 但截图记账模式不需要@bot
     if gid and not _accounting_mode:
-        msg_str = str(event.message)
-        is_at_me = _is_bot_mentioned(event)
-        is_mentioned = _is_bot_mentioned(event)
-        if not is_at_me and not is_mentioned:
+        if not _is_at_me:
             return
 
     # 收集所有图片（最多5张）
