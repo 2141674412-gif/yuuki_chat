@@ -276,7 +276,8 @@ cancel_remind_cmd = _register("取消提醒", _cmd_cancel_remind)
 # -- 定时检查提醒 --
 
 from .commands_schedule import _get_scheduler
-from nonebot import get_bot, logger, get_bots
+from nonebot import logger
+from .commands_base import get_bot_safe
 
 
 async def _check_reminders():
@@ -284,11 +285,10 @@ async def _check_reminders():
     now = datetime.now()
     changed = False
     try:
-        bots = get_bots()
-        if not bots:
+        bot = get_bot_safe()
+        if bot is None:
             logger.warning("[提醒] 获取bot实例失败，跳过本次检查。")
             return
-        bot = list(bots.values())[0]
     except Exception:
         logger.warning("[提醒] 获取bot实例失败，跳过本次检查。")
         return

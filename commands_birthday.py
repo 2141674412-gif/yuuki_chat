@@ -6,10 +6,10 @@ import random
 import time
 from datetime import datetime
 
-from nonebot import logger, get_bot
+from nonebot import logger
+from .commands_base import _register, _DATA_DIR, _load_json, _save_json, get_bot_safe, send_msg as _send
 from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent
 
-from .commands_base import _register, _DATA_DIR, _load_json, _save_json, send_msg as _send
 from .commands_schedule import _get_scheduler
 from .config import ALLOWED_GROUPS
 
@@ -215,11 +215,10 @@ async def _check_birthdays():
         _blessed[date_key] = {}
 
     try:
-        bots = get_bots()
-        if not bots:
+        bot = get_bot_safe()
+        if bot is None:
             logger.warning("[生日] 无法获取bot实例")
             return
-        bot = list(bots.values())[0]
     except Exception:
         logger.warning("[生日] 无法获取bot实例")
         return

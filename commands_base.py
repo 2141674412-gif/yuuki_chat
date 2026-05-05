@@ -17,6 +17,27 @@ from datetime import datetime
 # 第三方库
 from nonebot import on_command, get_driver, logger, get_bot
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent
+
+# 全局bot引用（在bot连接时自动保存）
+_bot_instance: Bot | None = None
+
+_driver = get_driver()
+
+@_driver.on_bot_connect
+def _save_bot_ref(bot: Bot):
+    global _bot_instance
+    _bot_instance = bot
+
+def get_bot_safe() -> Bot | None:
+    """安全获取bot实例，优先使用缓存的引用"""
+    global _bot_instance
+    if _bot_instance is not None:
+        return _bot_instance
+    try:
+        _bot_instance = get_bot()
+        return _bot_instance
+    except Exception:
+        return None
 from nonebot.exception import FinishedException
 
 # ---- 全局 HTTP 客户端（连接池复用） ----
@@ -288,7 +309,10 @@ _migrate_data()
 
 async def send_msg(event, msg):
     """发送消息辅助函数：根据 event 类型自动选择群消息或私聊消息"""
-    bot = get_bot()
+    bot = get_bot_safe()
+    if bot is None:
+        logger.warning("[send_msg] 无法获取bot实例")
+        return
     if hasattr(event, 'group_id'):
         await bot.send_group_msg(group_id=event.group_id, message=msg)
     else:
