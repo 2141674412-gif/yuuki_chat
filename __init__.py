@@ -122,6 +122,32 @@ __all__ = ["chat", "mai_cmd"]
 driver = get_driver()
 
 
+@driver.on_startup
+def _start_dashboard():
+    """后台启动排行榜网页服务"""
+    import threading
+    try:
+        from .dashboard.server import app
+        _dashboard_dir = _os.path.dirname(_os.path.abspath(__file__))
+        _data_dir = _os.path.join(_os.path.dirname(_PLUGIN_DIR), "yuuki_data")
+        app.config["DATA_DIR"] = _data_dir
+        app.config["DASHBOARD_DIR"] = _os.path.join(_PLUGIN_DIR, "dashboard")
+
+        def _run():
+            import logging as _logging
+            log = _logging.getLogger("werkzeug")
+            log.setLevel(_logging.WARNING)
+            app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
+
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+        logger.info("[排行榜] Dashboard 已启动: http://0.0.0.0:8080")
+    except ImportError:
+        logger.info("[排行榜] Flask未安装，跳过Dashboard启动（pip install flask）")
+    except Exception as e:
+        logger.warning(f"[排行榜] Dashboard启动失败: {e}")
+
+
 @driver.on_shutdown
 async def _shutdown():
     """关闭共享 HTTP 客户端"""
