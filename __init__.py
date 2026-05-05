@@ -124,26 +124,22 @@ driver = get_driver()
 
 @driver.on_startup
 def _start_dashboard():
-    """后台启动排行榜网页服务"""
+    """后台启动排行榜网页服务（无需额外依赖）"""
     import threading
     try:
-        from .dashboard.server import app
-        _dashboard_dir = _os.path.dirname(_os.path.abspath(__file__))
+        from .dashboard.server import start_server
         _data_dir = _os.path.join(_os.getcwd(), "yuuki_data")
-        app.config["DATA_DIR"] = _data_dir
-        app.config["DASHBOARD_DIR"] = _os.path.join(_PLUGIN_DIR, "dashboard")
+        _dash_dir = _os.path.join(_PLUGIN_DIR, "dashboard")
 
         def _run():
-            import logging as _logging
-            log = _logging.getLogger("werkzeug")
-            log.setLevel(_logging.WARNING)
-            app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
+            try:
+                start_server(_data_dir, _dash_dir, port=8080)
+            except Exception as e:
+                print(f"[排行榜] Dashboard运行出错: {e}")
 
         t = threading.Thread(target=_run, daemon=True)
         t.start()
         logger.info("[排行榜] Dashboard 已启动: http://0.0.0.0:8080")
-    except ImportError:
-        logger.info("[排行榜] Flask未安装，跳过Dashboard启动（pip install flask）")
     except Exception as e:
         logger.warning(f"[排行榜] Dashboard启动失败: {e}")
 
