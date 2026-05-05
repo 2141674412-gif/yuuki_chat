@@ -631,6 +631,11 @@
                 const resp = await fetch('/api/data');
                 if (!resp.ok) throw new Error('API error');
                 appData = await resp.json();
+                // 保存诊断信息
+                window._dashboardDebug = {
+                    data_dir: appData.data_dir || '',
+                    files_exist: appData.files_exist || {}
+                };
                 document.getElementById('refreshStatus').textContent = '已连接到服务器';
             } catch (e) {
                 console.warn('API unavailable, using sample data:', e.message);
@@ -727,10 +732,20 @@
             }
 
             if (entries.length === 0) {
+                // 显示诊断信息
+                const diag = window._dashboardDebug || {};
+                const filesInfo = (diag.files_exist || {});
+                const filesHtml = Object.entries(filesInfo).map(([f, exists]) =>
+                    `<span style="color:${exists ? '#4ECDC4' : '#e94560'}">${exists ? '✓' : '✗'} ${f}</span>`
+                ).join('<br>');
                 list.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-icon">&#128203;</div>
                         <p>暂无数据</p>
+                        <div style="margin-top:12px;font-size:12px;color:#888;text-align:left;background:rgba(255,255,255,0.05);padding:12px;border-radius:8px;">
+                            <div>数据目录: ${diag.data_dir || '未知'}</div>
+                            <div style="margin-top:6px">${filesHtml}</div>
+                        </div>
                     </div>`;
                 return;
             }

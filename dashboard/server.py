@@ -28,7 +28,8 @@ def load_json(filename, default=None):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError, PermissionError):
+    except (FileNotFoundError, json.JSONDecodeError, PermissionError) as e:
+        print(f"[Dashboard] 加载 {filename} 失败: {e} (路径: {filepath})")
         return default if default is not None else {}
 
 
@@ -41,6 +42,7 @@ def index():
 @app.route('/api/data')
 def api_data():
     """Return combined data from all JSON files."""
+    data_dir = _get_data_dir()
     checkin_records = load_json('checkin_records.json', {})
     user_points = load_json('user_points.json', {})
     user_profiles = load_json('user_profiles.json', {})
@@ -49,6 +51,12 @@ def api_data():
         'checkin_records': checkin_records,
         'user_points': user_points,
         'user_profiles': user_profiles,
+        'data_dir': data_dir,
+        'files_exist': {
+            'checkin_records.json': os.path.exists(os.path.join(data_dir, 'checkin_records.json')),
+            'user_points.json': os.path.exists(os.path.join(data_dir, 'user_points.json')),
+            'user_profiles.json': os.path.exists(os.path.join(data_dir, 'user_profiles.json')),
+        },
         'server_time': datetime.now().isoformat()
     })
 
@@ -61,6 +69,7 @@ def health():
         'status': 'ok',
         'time': datetime.now().isoformat(),
         'data_dir': data_dir,
+        'cwd': os.getcwd(),
         'files': {
             'checkin_records.json': os.path.exists(os.path.join(data_dir, 'checkin_records.json')),
             'user_points.json': os.path.exists(os.path.join(data_dir, 'user_points.json')),
