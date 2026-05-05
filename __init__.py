@@ -129,7 +129,7 @@ def _start_dashboard():
     try:
         from .dashboard.server import app
         _dashboard_dir = _os.path.dirname(_os.path.abspath(__file__))
-        _data_dir = _os.path.join(_os.path.dirname(_PLUGIN_DIR), "yuuki_data")
+        _data_dir = _os.path.join(_os.getcwd(), "yuuki_data")
         app.config["DATA_DIR"] = _data_dir
         app.config["DASHBOARD_DIR"] = _os.path.join(_PLUGIN_DIR, "dashboard")
 

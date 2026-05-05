@@ -14,7 +14,7 @@ app = Flask(__name__)
 def _get_data_dir():
     return current_app.config.get("DATA_DIR",
         os.environ.get('YUUKI_DATA_DIR',
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'yuuki_data')))
+            os.path.join(os.getcwd(), "yuuki_data")))
 
 
 def _get_dashboard_dir():
