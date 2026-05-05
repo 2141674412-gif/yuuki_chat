@@ -42,7 +42,7 @@ COMMAND_NAMES = [
     "天气", "weather", "绑定天气", "bindweather", "解绑天气", "unbindweather",
     "我的天气", "myweather", "setcity",
     "生日", "birthday", "设置生日", "setbirthday", "setbirth", "删除生日", "delbirthday", "delbirth",
-    "记", "记账", "记录", "账单", "账目", "明细", "统计", "汇总", "清空记账", "清除记账",
+    "记", "记账", "记录", "账单", "账目", "明细", "统计", "汇总", "清空记账", "清除记账", "删记录", "删除记录", "delrecord",
     "词云",
     "提醒",
     "提醒列表", "提醒历史", "remindlist",

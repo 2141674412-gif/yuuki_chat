@@ -1681,7 +1681,7 @@ type规则：支出→"expense"，收入→"income"
                                                 "amount": amount,
                                                 "category": category,
                                                 "note": note,
-                                                "date": now.strftime("%m-%d %H:%M"),
+                                                "date": now.strftime("%Y-%m-%d %H:%M"),
                                                 "type": record_type,
                                             }
                                             if uid not in _accounting:

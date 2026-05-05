@@ -10,7 +10,7 @@ from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent
 
 # 从子模块导入
-from .commands_base import check_superuser, _save_json, _DATA_DIR, send_msg as _send
+from .commands_base import check_superuser, _save_json, _load_json, _DATA_DIR, send_msg as _send
 
 
 

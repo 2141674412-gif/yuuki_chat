@@ -276,7 +276,6 @@ cancel_remind_cmd = _register("取消提醒", _cmd_cancel_remind)
 # -- 定时检查提醒 --
 
 from .commands_schedule import _get_scheduler
-from nonebot import logger
 from .commands_base import get_bot_safe
 
 

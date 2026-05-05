@@ -168,13 +168,12 @@ from .commands_schedule import _get_scheduler
 
 async def _send_checkin_remind(user_id: str):
     """发送签到提醒（私聊优先，失败则群@）"""
-    from nonebot import get_bot, get_bots
+    from .commands_base import get_bot_safe
     try:
-        bots = get_bots()
-        if not bots:
+        bot = get_bot_safe()
+        if bot is None:
             logger.warning("[签到提醒] 获取bot实例失败")
             return
-        bot = list(bots.values())[0]
     except Exception:
         logger.warning("[签到提醒] 获取bot实例失败")
         return
