@@ -233,7 +233,7 @@ async def _extract_update(filepath):
         for name in zf.namelist():
             if name.endswith("/") or name.endswith("\\") or os.path.basename(name).startswith("."):
                 continue
-            if not (name.endswith(".py") or name.endswith(".json") or name.startswith("assets/")):
+            if not (name.endswith(".py") or name.endswith(".json") or name.endswith(".html") or name.startswith("assets/") or name.startswith("dashboard/")):
                 continue
 
             if name.endswith(".py"):
