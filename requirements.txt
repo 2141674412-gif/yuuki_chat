@@ -1,0 +1,20 @@
+# NoneBot2 核心
+nonebot2>=2.0.0
+nonebot-adapter-onebot>=1.5.0
+
+# HTTP 客户端
+httpx>=0.25.0
+
+# 环境变量
+python-dotenv>=1.0.0
+
+# AI 模型支持
+openai>=1.0.0
+
+# 插件依赖
+nonebot-plugin-apscheduler>=0.3.0
+nonebot-plugin-sentry>=0.1.0
+sentry-sdk>=1.40.0
+
+# 可选：图片处理（如果使用本地封面）
+Pillow>=10.0.0
