@@ -26,7 +26,7 @@ from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent, Me
 from nonebot.exception import FinishedException
 from openai import APIError, APITimeoutError, BadRequestError, OpenAI
 from PIL import Image
-from qreader import QReader
+# from qreader import QReader
 
 # 本地模块
 from .config import ALLOWED_GROUPS, COMMAND_NAMES, load_persona, DATA_DIR, CHAT_WHITELIST
@@ -1103,65 +1103,65 @@ async def handle_chatter(event: GroupMessageEvent):
     _last_chatter_time[event.group_id] = time.time()
 
 
-# ========== 自动识别二维码 ==========
-
-_qrcode = on_message(priority=3, block=False)
-
-_qr_detector = QReader()
-# 已被二维码handler处理并回复的message_id（任何二维码，不只是SGWCMAID）
-_qr_handled = set()
-_QR_HANDLED_MAX = 500
-
-@_qrcode.handle()
-async def handle_qrcode(event: MessageEvent):
-    """检测图片中的二维码并自动回复内容"""
-    # 群白名单检查
-    gid = getattr(event, 'group_id', None)
-    if gid and gid not in ALLOWED_GROUPS:
-        return
-    for seg in event.message:
-        if seg.type == "image":
-            url = seg.data.get("url", "")
-            if not url:
-                continue
-            try:
-                logger.debug(f"[二维码] 检测到图片，正在下载: {url[:60]}...")
-                try:
-                    resp = await _get_http_client().get(url)
-                except Exception:
-                    continue
-                if resp.status_code != 200:
-                    logger.debug(f"[二维码] 下载失败: HTTP {resp.status_code}")
-                    continue
-                img = Image.open(BytesIO(resp.content)).convert("RGB")
-                results = _qr_detector.detect_and_decode(np.array(img))
-                logger.debug(f"[二维码] 检测结果: {results}")
-                if results:
-                    text = results[0]
-                    if isinstance(text, tuple):
-                        text = text[0]
-                    if not isinstance(text, str):
-                        text = text.data
-                    if isinstance(text, bytes):
-                        text = text.decode("utf-8", errors="ignore")
-                else:
-                    text = ""
-                text = text.strip()
-                if text:
-                    # 标记此消息已被二维码handler处理
-                    _qr_handled.add(event.message_id)
-                    if len(_qr_handled) > _QR_HANDLED_MAX:
-                        _qr_handled.clear()
-                    if text.startswith("SGWCMAID"):
-                        logger.debug(f"[二维码] 检测到SGWCMAID: {event.message_id}")
-                        await _qrcode.send(f"识别到机台二维码：\n{text}")
-                    else:
-                        await _qrcode.send(f"识别到二维码：\n{text}")
-                    raise FinishedException
-            except FinishedException:
-                raise
-            except Exception as e:
-                logger.warning(f"[二维码] 识别异常: {e}")
+# ========== 自动识别二维码（已禁用，需安装 qreader）==========
+# 
+# _qrcode = on_message(priority=3, block=False)
+# 
+# _qr_detector = QReader()
+# # 已被二维码handler处理并回复的message_id（任何二维码，不只是SGWCMAID）
+# _qr_handled = set()
+# _QR_HANDLED_MAX = 500
+# 
+# @_qrcode.handle()
+# async def handle_qrcode(event: MessageEvent):
+#     """检测图片中的二维码并自动回复内容"""
+#     # 群白名单检查
+#     gid = getattr(event, 'group_id', None)
+#     if gid and gid not in ALLOWED_GROUPS:
+#         return
+#     for seg in event.message:
+#         if seg.type == "image":
+#             url = seg.data.get("url", "")
+#             if not url:
+#                 continue
+#             try:
+#                 logger.debug(f"[二维码] 检测到图片，正在下载: {url[:60]}...")
+#                 try:
+#                     resp = await _get_http_client().get(url)
+#                 except Exception:
+#                     continue
+#                 if resp.status_code != 200:
+#                     logger.debug(f"[二维码] 下载失败: HTTP {resp.status_code}")
+#                     continue
+#                 img = Image.open(BytesIO(resp.content)).convert("RGB")
+#                 results = _qr_detector.detect_and_decode(np.array(img))
+#                 logger.debug(f"[二维码] 检测结果: {results}")
+#                 if results:
+#                     text = results[0]
+#                     if isinstance(text, tuple):
+#                         text = text[0]
+#                     if not isinstance(text, str):
+#                         text = text.data
+#                     if isinstance(text, bytes):
+#                         text = text.decode("utf-8", errors="ignore")
+#                 else:
+#                     text = ""
+#                 text = text.strip()
+#                 if text:
+#                     # 标记此消息已被二维码handler处理
+#                     _qr_handled.add(event.message_id)
+#                     if len(_qr_handled) > _QR_HANDLED_MAX:
+#                         _qr_handled.clear()
+#                     if text.startswith("SGWCMAID"):
+#                         logger.debug(f"[二维码] 检测到SGWCMAID: {event.message_id}")
+#                         await _qrcode.send(f"识别到机台二维码：\n{text}")
+#                     else:
+#                         await _qrcode.send(f"识别到二维码：\n{text}")
+#                     raise FinishedException
+#             except FinishedException:
+#                 raise
+#             except Exception as e:
+#                 logger.warning(f"[二维码] 识别异常: {e}")
 
 
 # ========== B站视频卡片 ==========
